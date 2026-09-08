@@ -38,24 +38,35 @@ class Settings:
     _url = os.getenv("DATABASE_URL")
     _parsed = _db_from_url(_url) if _url else None
 
-    DB_HOST = os.getenv("DB_HOST") or os.getenv("PGHOST") or (
-        _parsed["host"] if _parsed else "localhost"
+    # DATABASE_URL (Railway) wins over leftover local DB_HOST=localhost values
+    DB_HOST = (
+        (_parsed["host"] if _parsed else None)
+        or os.getenv("DB_HOST")
+        or os.getenv("PGHOST")
+        or "localhost"
     )
     DB_PORT = int(
-        os.getenv("DB_PORT")
+        (_parsed["port"] if _parsed else None)
+        or os.getenv("DB_PORT")
         or os.getenv("PGPORT")
-        or (_parsed["port"] if _parsed else 5432)
+        or 5432
     )
-    DB_NAME = os.getenv("DB_NAME") or os.getenv("PGDATABASE") or (
-        _parsed["dbname"] if _parsed else "recipes_db"
+    DB_NAME = (
+        (_parsed["dbname"] if _parsed else None)
+        or os.getenv("DB_NAME")
+        or os.getenv("PGDATABASE")
+        or "recipes_db"
     )
-    DB_USER = os.getenv("DB_USER") or os.getenv("PGUSER") or (
-        _parsed["user"] if _parsed else "postgres"
+    DB_USER = (
+        (_parsed["user"] if _parsed else None)
+        or os.getenv("DB_USER")
+        or os.getenv("PGUSER")
+        or "postgres"
     )
     DB_PASSWORD = (
-        os.getenv("POSTGRES_PASSWORD")
+        (_parsed["password"] if _parsed else None)
+        or os.getenv("POSTGRES_PASSWORD")
         or os.getenv("PGPASSWORD")
-        or (_parsed["password"] if _parsed else None)
     )
     DB_POOL_MIN = _int("DB_POOL_MIN", 2)
     DB_POOL_MAX = _int("DB_POOL_MAX", 20)
