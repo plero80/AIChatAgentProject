@@ -13,7 +13,7 @@ export default function MessageList({ messages, isTyping }) {
     <div className="message-list" role="log" aria-live="polite">
       {messages.length === 0 && (
         <p className="empty-hint">
-          Try: “יש לי אורז, פטריות וערמונים — תביאי מתכון של אלונה”
+          נסי למשל: יש לי אורז, פטריות וערמונים — תביאי מתכון של אלונה
         </p>
       )}
 
@@ -33,7 +33,7 @@ export default function MessageList({ messages, isTyping }) {
 
       {isTyping && (
         <article className="bubble bubble-alona typing">
-          <span className="bubble-label">Alona</span>
+          <span className="bubble-label">אלונה</span>
           <div className="bubble-body">
             <span className="dot" />
             <span className="dot" />

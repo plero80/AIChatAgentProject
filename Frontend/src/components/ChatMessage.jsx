@@ -3,7 +3,7 @@ export default function ChatMessage({ role, content }) {
 
   return (
     <article className={`bubble ${isUser ? 'bubble-user' : 'bubble-alona'}`}>
-      <span className="bubble-label">{isUser ? 'You' : 'Alona'}</span>
+      <span className="bubble-label">{isUser ? 'את' : 'אלונה'}</span>
       <div className="bubble-body">{content}</div>
     </article>
   )

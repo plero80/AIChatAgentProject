@@ -24,13 +24,13 @@ export default function ChatInput({ onSend, disabled }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Ask Alona for a recipe, ingredients, or tips…"
+        placeholder="שאלי את אלונה על מתכון, מצרכים או טיפים…"
         rows={2}
         disabled={disabled}
-        aria-label="Message"
+        aria-label="הודעה"
       />
       <button type="submit" disabled={disabled || !value.trim()}>
-        Send
+        שלחי
       </button>
     </form>
   )
