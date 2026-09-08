@@ -27,23 +27,30 @@ async def lifespan(app: FastAPI):
     # Build the graph once, before any request can race to create it
     global _graph
 
-    async with AsyncConnectionPool(
-        conninfo=get_db_conninfo(),
-        min_size=1,
-        max_size=10,
-        kwargs={"autocommit": True, "prepare_threshold": 0},
-    ) as pool:
-        checkpointer = AsyncPostgresSaver(pool)
-        await checkpointer.setup()
+    try:
+        async with AsyncConnectionPool(
+            conninfo=get_db_conninfo(),
+            min_size=1,
+            max_size=10,
+            kwargs={"autocommit": True, "prepare_threshold": 0},
+        ) as pool:
+            checkpointer = AsyncPostgresSaver(pool)
+            await checkpointer.setup()
 
-        _graph = create_app(checkpointer=checkpointer)
-        logger.info(
-            "Ready: db=%s model=%s limits=%s/user %s/ip",
-            settings.DB_NAME,
-            settings.CHAT_MODEL,
-            settings.RATE_LIMIT_PER_USER,
-            settings.RATE_LIMIT_PER_IP,
+            _graph = create_app(checkpointer=checkpointer)
+            logger.info(
+                "Ready: db=%s model=%s limits=%s/user %s/ip",
+                settings.DB_NAME,
+                settings.CHAT_MODEL,
+                settings.RATE_LIMIT_PER_USER,
+                settings.RATE_LIMIT_PER_IP,
+            )
+            yield
+    except Exception:
+        logger.exception(
+            "Startup failed (check DATABASE_URL and pgvector). HTTP is up so logs are visible."
         )
+        _graph = None
         yield
 
     logger.info("Shutdown complete")

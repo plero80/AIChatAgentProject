@@ -69,7 +69,7 @@ class Settings:
         ["http://localhost:5173", "http://127.0.0.1:5173"],
     )
     API_HOST = os.getenv("API_HOST") or ("0.0.0.0" if _on_railway() else "127.0.0.1")
-    API_PORT = int(os.getenv("PORT") or os.getenv("API_PORT") or 8000)
+    API_PORT = int(os.getenv("PORT") or os.getenv("API_PORT") or (8080 if _on_railway() else 8000))
     API_RELOAD = os.getenv("API_RELOAD", "false" if _on_railway() else "true").lower() == "true"
 
     RATE_LIMIT_PER_USER = _int("RATE_LIMIT_PER_USER", 15)
