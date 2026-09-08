@@ -167,7 +167,9 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
 
 # Mounted last so it never shadows the API routes above.
 # In dev the Vite server serves the UI instead, and this directory won't exist.
-FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
+FRONTEND_DIST = Path(__file__).resolve().parent / "Frontend" / "dist"
+if not FRONTEND_DIST.is_dir():
+    FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 
 if FRONTEND_DIST.is_dir():
     app.mount(

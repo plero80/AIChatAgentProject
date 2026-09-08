@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # Config
 from Config import settings
+from Schema import apply_schema
 
 # Database
 from Database.Database import Database
@@ -82,6 +83,7 @@ def get_required_services():
         min_size=settings.DB_POOL_MIN,
         max_size=settings.DB_POOL_MAX,
     )
+    apply_schema(db)
 
     # --------------------------------
     # 3. Repositories
