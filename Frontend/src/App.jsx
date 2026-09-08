@@ -20,7 +20,13 @@ function newId() {
 }
 
 export default function App() {
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'שלום, אני העוזרת של אלונה, אני כאן לכל בקשה 😊',
+    },
+  ])
   const [isTyping, setIsTyping] = useState(false)
   const [error, setError] = useState(null)
 
@@ -48,11 +54,11 @@ export default function App() {
       <div className="glow glow-b" aria-hidden="true" />
 
       <main className="stage">
-        <header className="brand" lang="en" dir="ltr">
-          <p className="brand-name">Alona</p>
-          <h1 className="brand-line">Recipes from the kitchen, not from thin air.</h1>
+        <header className="brand" lang="he" dir="rtl">
+          <p className="brand-name" lang="en" dir="ltr">Alona</p>
+          <h1 className="brand-line">מתכונים מהמטבח, לא מהאוויר.</h1>
           <p className="brand-sub">
-            Ask for saved Instagram recipes, ingredient matches, or cooking help.
+            שאלי על מתכונים שמורים מאינסטגרם, התאמת מצרכים, או עזרה בבישול.
           </p>
         </header>
 

@@ -88,8 +88,7 @@ body {
 
 .brand {
   animation: rise 0.7s ease-out both;
-  font-family: "Manrope", "Segoe UI", sans-serif;
-  text-align: left;
+  text-align: start;
 }
 
 .brand-name {
@@ -100,22 +99,23 @@ body {
   letter-spacing: -0.03em;
   line-height: 0.95;
   color: var(--olive-deep);
+  text-align: start;
 }
 
 .brand-line {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: clamp(1.15rem, 2.6vw, 1.55rem);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink);
-  max-width: 18ch;
+  max-width: 22em;
 }
 
 .brand-sub {
   margin: 0.65rem 0 0;
   color: var(--ink-soft);
   font-size: 1rem;
-  max-width: 36ch;
+  max-width: 36em;
   line-height: 1.45;
 }
 

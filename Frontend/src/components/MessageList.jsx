@@ -11,12 +11,6 @@ export default function MessageList({ messages, isTyping }) {
 
   return (
     <div className="message-list" role="log" aria-live="polite">
-      {messages.length === 0 && (
-        <p className="empty-hint">
-          נסי למשל: יש לי אורז, פטריות וערמונים — תביאי מתכון של אלונה
-        </p>
-      )}
-
       {messages.map((msg) => (
         <ChatMessage
           key={msg.id}
