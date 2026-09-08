@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg import errors as pg_errors
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 
@@ -30,9 +31,17 @@ async def lifespan(app: FastAPI):
     try:
         async with AsyncConnectionPool(
             conninfo=get_db_conninfo(),
-            min_size=1,
+            min_size=0,
             max_size=10,
-            kwargs={"autocommit": True, "prepare_threshold": 0},
+            check=AsyncConnectionPool.check_connection,
+            kwargs={
+                "autocommit": True,
+                "prepare_threshold": 0,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+            },
         ) as pool:
             checkpointer = AsyncPostgresSaver(pool)
             await checkpointer.setup()
@@ -140,10 +149,17 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
     started = time.monotonic()
 
     try:
-        result = await get_graph().arun(
-            message=request.message.strip(),
-            user_id=user_id,
-        )
+        try:
+            result = await get_graph().arun(
+                message=request.message.strip(),
+                user_id=user_id,
+            )
+        except (pg_errors.AdminShutdown, pg_errors.OperationalError):
+            logger.warning("Postgres dropped a connection; retrying once")
+            result = await get_graph().arun(
+                message=request.message.strip(),
+                user_id=user_id,
+            )
 
         reply = result.get("final_response") or ""
         analysis = result.get("analysis")

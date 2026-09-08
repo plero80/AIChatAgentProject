@@ -24,7 +24,14 @@ class Database:
             ),
             min_size=min_size,
             max_size=max_size,
-            kwargs={"row_factory": dict_row},
+            check=ConnectionPool.check_connection,
+            kwargs={
+                "row_factory": dict_row,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 3,
+            },
             open=True,
         )
 
