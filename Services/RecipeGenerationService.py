@@ -11,16 +11,21 @@ class RecipeGenerationService:
     ):
         self.llm = llm
 
-    def generate_original_recipe(
+    async def generate_original_recipe(
         self,
         plan: RecipePlan
     ) -> str:
 
-        response = self.llm.invoke(
+        response = await self.llm.ainvoke(
             f"""
-            Create an original recipe.
+            Invent a fully ORIGINAL recipe of your own.
+            This is NOT an Alona Eckrling recipe and must not come from any
+            saved recipe database. Do not reuse a known Alona recipe name
+            or Instagram URL. Clearly present it as your original idea.
 
-            Ingredients:
+            Match the user's language (Hebrew if they wrote in Hebrew).
+
+            Ingredients to use / emphasize:
             {plan.ingredients}
 
             Preferences:
@@ -30,14 +35,13 @@ class RecipeGenerationService:
 
         return response.content
 
-    
-    def generate_inspired_recipe(
+    async def generate_inspired_recipe(
         self,
         plan: RecipePlan,
         similar_recipes: list[Recipe],
     ) -> str:
 
-        response = self.llm.invoke(
+        response = await self.llm.ainvoke(
             f"""
             Create a new recipe inspired by the recipes below.
 

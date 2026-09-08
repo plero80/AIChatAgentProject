@@ -1,0 +1,5 @@
+/* base reset lives mostly in App.css */
+body {
+  -webkit-font-smoothing: antialiased;
+}
+

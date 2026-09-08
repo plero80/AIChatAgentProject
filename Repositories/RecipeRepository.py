@@ -60,6 +60,27 @@ class RecipeRepository:
         # Preserve ranking order from similarity search
         return [by_id[recipe_id] for recipe_id in recipes_ids if recipe_id in by_id]
 
+    def find_existing_id(
+        self,
+        name: str,
+        instagram_url: str | None = None,
+    ) -> UUID | None:
+        """Identify an already-ingested recipe by its Instagram post or exact name."""
+        if instagram_url:
+            row = self.db.fetch_one(
+                "SELECT id FROM recipes WHERE instagram_url = %s",
+                (instagram_url,),
+            )
+            if row is not None:
+                return row["id"]
+
+        row = self.db.fetch_one(
+            "SELECT id FROM recipes WHERE name = %s",
+            (name,),
+        )
+
+        return row["id"] if row is not None else None
+
     def search_by_name(self, name: str) -> list[Recipe]:
         rows = self.db.fetch_all(
             """
@@ -83,9 +104,11 @@ class RecipeRepository:
         self,
         recipe_id: UUID,
         recipe: RecipeCreate,
+        db=None,
     ) -> None:
 
-        self.db.execute(
+        conn = db or self.db
+        conn.execute(
             """
             INSERT INTO recipes (
                 id,

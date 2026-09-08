@@ -6,7 +6,7 @@ class AnalyzeNode:
     def __init__(self, analyzer: MessageAnalyzer):
         self.analyzer = analyzer
 
-    def __call__(self, state: GraphState) -> dict:
+    async def __call__(self, state: GraphState) -> dict:
         history = state.get("messages") or []
         recent = []
         for message in history[-6:]:
@@ -26,5 +26,8 @@ class AnalyzeNode:
             )
 
         return {
-            "analysis": self.analyzer.analyze(analysis_input),
+            "analysis": await self.analyzer.analyze(
+                analysis_input,
+                current_user_message=state["message"],
+            ),
         }

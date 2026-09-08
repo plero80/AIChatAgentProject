@@ -82,10 +82,8 @@ class RecipeIngestionGraph:
     def run(
         self,
         raw_recipe: str,
-        instagram_url: str | None = None,
     ) -> RecipeIngestionState:
 
         return self.graph.invoke({
             "raw_recipe": raw_recipe,
-            "instagram_url": instagram_url,
         })

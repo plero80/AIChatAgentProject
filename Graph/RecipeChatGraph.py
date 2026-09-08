@@ -1,3 +1,5 @@
+import asyncio
+
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import HumanMessage
@@ -7,7 +9,7 @@ from Nodes.AnalyzeNode import AnalyzeNode
 from Nodes.RecipeNode import RecipeNode
 from Nodes.ResponseNode import ResponseNode
 from Nodes.ChatNode import ChatNode
-#from Nodes.DietitianNode import DietitianNode
+from Nodes.DietitianNode import DietitianNode
 
 
 class RecipeChatGraph:
@@ -18,16 +20,18 @@ class RecipeChatGraph:
         recipe_node: RecipeNode,
         response_node: ResponseNode,
         chat_node: ChatNode,
-        #dietitian_node: DietitianNode,
+        dietitian_node: DietitianNode,
+        checkpointer=None,
     ):
-        self.memory = InMemorySaver()
+        # Falls back to in-process memory when no durable store is provided
+        self.memory = checkpointer or InMemorySaver()
 
         self.nodes = {
             "analyze": analyze_node,
             "recipe": recipe_node,
             "response": response_node,
             "chat": chat_node,
-            #"dietitian": dietitian_node,
+            "dietitian": dietitian_node,
         }
 
         self.graph = self.build_graph()
@@ -54,10 +58,10 @@ class RecipeChatGraph:
         )
 
 
-        #graph.add_node(
-        #    "dietitian",
-        #    self.nodes["dietitian"],
-        #)
+        graph.add_node(
+            "dietitian",
+            self.nodes["dietitian"],
+        )
 
         graph.add_node(
             "response",
@@ -77,7 +81,7 @@ class RecipeChatGraph:
             {
                 "chat": "chat",
                 "recipe": "recipe",
-                #"dietitian": "dietitian",
+                "dietitian": "dietitian",
             },
         )
 
@@ -92,10 +96,10 @@ class RecipeChatGraph:
             "response",
         )
 
-       # graph.add_edge(
-        #    "dietitian",
-        #    "response",
-        #)
+        graph.add_edge(
+            "dietitian",
+            "response",
+        )
 
         graph.add_edge(
             "response",
@@ -107,7 +111,7 @@ class RecipeChatGraph:
             checkpointer=self.memory
         )
 
-    def run(
+    async def arun(
         self,
         message: str,
         user_id: str,
@@ -127,12 +131,25 @@ class RecipeChatGraph:
             }
         }
 
-        result = self.graph.invoke(
+        result = await self.graph.ainvoke(
             initial_state,
             config=config,
         )
 
         return result
+
+    def run(
+        self,
+        message: str,
+        user_id: str,
+    ):
+        """Blocking entry point for the CLI. The nodes are async-only."""
+        return asyncio.run(
+            self.arun(
+                message=message,
+                user_id=user_id,
+            )
+        )
 
     def route_after_analysis(self,state: GraphState) -> str:
         analysis = state["analysis"]
@@ -145,7 +162,7 @@ class RecipeChatGraph:
         if analysis.intent == "food":
             return "recipe"
 
-        #if analysis.intent == "dietitian_escort":
-            #return "dietitian"
+        if analysis.intent == "dietitian_escort":
+            return "dietitian"
 
         return "chat"

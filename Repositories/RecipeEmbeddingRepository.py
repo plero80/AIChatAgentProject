@@ -71,10 +71,12 @@ class RecipeEmbeddingRepository:
         recipe_id: UUID,
         embedding: list[float],
         model: str,
+        db=None,
     ) -> None:
         embedding_string = "[" + ",".join(map(str, embedding)) + "]"
 
-        self.db.execute(
+        conn = db or self.db
+        conn.execute(
             """
             INSERT INTO recipe_embeddings (
                 recipe_id,
