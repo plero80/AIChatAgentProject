@@ -1,7 +1,7 @@
 // Work on Markdown's parsed tree: prose, code, links, and HTML retain the
 // escaping and URL protections provided by ReactMarkdown.
-const ingredientLabel = /^(?:מצרכים|מרכיבים|רכיבים|ingredients)(?:\s|:|$)/iu
-const methodLabel = /^(?:אופן\s+(?:ההכנה|הכנה)|הוראות(?:\s+הכנה)?|הכנה|instructions|directions|method|preparation)(?:\s|:|$)/iu
+const ingredientLabel = /^(?:(?:רשימת\s+)?ה?(?:מצרכים|מרכיבים|רכיבים)|ingredients)(?:\s|:|$)/iu
+const methodLabel = /^(?:אופן\s+(?:ההכנה|הכנה)|הוראות(?:\s+הכנה)?|ה?הכנה|instructions|directions|method|preparation)(?:\s|:|$)/iu
 const otherLabel = /^(?:טיפים?|הערות|הגשה|בתיאבון|instagram|אינסטגרם|מקור|tips?|notes?|serving|source)(?:\s|:|$)/iu
 
 function textOf(node) {
@@ -16,10 +16,17 @@ function normalizeTitle(value) {
 
 function sectionKind(node) {
   if (node.type !== 'heading' && node.type !== 'paragraph') return null
-  const label = textOf(node).trim().replace(/[：:]+$/, '')
+  const rawLabel = textOf(node).trim()
+  const label = rawLabel.replace(/[：:]+$/, '')
   // A section label is short and contains no prose or list items.
   if (label.length > 55 || node.children?.some(child => child.type === 'image' || child.type === 'link')) return null
-  if (ingredientLabel.test(label)) return 'ingredients'
+  const ingredientMatch = label.match(ingredientLabel)
+  if (ingredientMatch) {
+    const suffix = label.slice(ingredientMatch[0].length).trim()
+    // A longer phrase needs heading markup or a colon; mentioning ingredients
+    // in an ordinary sentence must not turn that sentence into a section.
+    if (node.type === 'heading' || /[：:]$/.test(rawLabel) || !suffix || /^\([^)]*\)$/.test(suffix)) return 'ingredients'
+  }
   if (methodLabel.test(label)) return 'method'
   return null
 }
@@ -88,7 +95,7 @@ function isSourceParagraph(node) {
   const links = node.children.filter(child => child.type === 'link')
   if (links.length !== 1 || !isInstagramUrl(links[0].url)) return false
   const rest = node.children.filter(child => child !== links[0]).map(textOf).join('').trim()
-  return /^(?:(?:instagram|אינסטגרם|מקור|source|קישור(?:\s+למתכון)?)\s*)?[:：.\s]*$/iu.test(rest)
+  return /^(?:(?:instagram(?:\s+(?:url|link))?|אינסטגרם|מקור|source|קישור(?:\s+למתכון)?)\s*)?[:：.\s]*$/iu.test(rest)
 }
 
 function imageParagraph(node) {
