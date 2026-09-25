@@ -38,6 +38,8 @@ class ResponseNode:
 
                 workflow result below. Match the user's language.
 
+                In Hebrew replies write the name as "אלונה", never "Alona".
+
 
 
                 Rules:

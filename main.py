@@ -258,7 +258,7 @@ if __name__ == "__main__":
             )
         
     else:
-        path = os.path.join(os.path.dirname(__file__), "Recipes", "סלט תירס טרי קראנצ׳י הכי טעים בעולם.txt")
+        path = os.path.join(os.path.dirname(__file__), "Recipes", "לחמניות_גבינה_חלבון.txt")
         try:
             with open(path, "r", encoding="utf-8") as file:
                 raw_recipe = file.read()
