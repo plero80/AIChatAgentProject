@@ -8,7 +8,7 @@ class ChatNode:
     def __init__(self, llm: BaseChatModel):
         self.llm = llm
 
-    def __call__(self, state: GraphState) -> dict:
+    async def __call__(self, state: GraphState) -> dict:
         history = state.get("messages") or []
         prompt_messages = [
             (
@@ -26,7 +26,7 @@ class ChatNode:
         if not any(isinstance(m, HumanMessage) for m in history[-2:]):
             prompt_messages.append(HumanMessage(content=state["message"]))
 
-        reply = self.llm.invoke(prompt_messages)
+        reply = await self.llm.ainvoke(prompt_messages)
         text = reply.content if isinstance(reply.content, str) else str(reply.content)
 
         return {

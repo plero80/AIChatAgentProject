@@ -13,6 +13,7 @@ class RecipeCreate(BaseModel):
     instructions: str | None = Field(description="The instructions for the recipe.",default=None)
 
     instagram_url: str | None = Field(description="The URL of the Instagram post where the recipe was posted.",default=None)
+    image_url: str | None = Field(description="A stable URL of the recipe photo.",default=None)
 
     ingredients: list[IngredientCreate]
 

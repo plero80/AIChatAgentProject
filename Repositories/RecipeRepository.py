@@ -25,6 +25,7 @@ class RecipeRepository:
                 description,
                 instructions,
                 instagram_url,
+                image_url,
                 created_at
             FROM recipes
             WHERE id = %s
@@ -49,6 +50,7 @@ class RecipeRepository:
                 description,
                 instructions,
                 instagram_url,
+                image_url,
                 created_at
             FROM recipes
             WHERE id = ANY(%s)
@@ -90,6 +92,7 @@ class RecipeRepository:
                 description,
                 instructions,
                 instagram_url,
+                image_url,
                 created_at
             FROM recipes
             WHERE name ILIKE %s
@@ -115,9 +118,10 @@ class RecipeRepository:
                 name,
                 description,
                 instructions,
-                instagram_url
+                instagram_url,
+                image_url
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 recipe_id,
@@ -125,6 +129,7 @@ class RecipeRepository:
                 recipe.description,
                 recipe.instructions,
                 recipe.instagram_url,
+                recipe.image_url,
             ),
         )
         

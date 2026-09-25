@@ -6,10 +6,8 @@ from langchain_core.messages import HumanMessage
 
 from Graph.GraphState import GraphState
 from Nodes.AnalyzeNode import AnalyzeNode
-from Nodes.RecipeNode import RecipeNode
+from Nodes.GuardNode import GuardNode
 from Nodes.ResponseNode import ResponseNode
-from Nodes.ChatNode import ChatNode
-from Nodes.DietitianNode import DietitianNode
 
 
 class RecipeChatGraph:
@@ -17,10 +15,8 @@ class RecipeChatGraph:
     def __init__(
         self,
         analyze_node: AnalyzeNode,
-        recipe_node: RecipeNode,
+        guard_node: GuardNode,
         response_node: ResponseNode,
-        chat_node: ChatNode,
-        dietitian_node: DietitianNode,
         checkpointer=None,
     ):
         # Falls back to in-process memory when no durable store is provided
@@ -28,10 +24,8 @@ class RecipeChatGraph:
 
         self.nodes = {
             "analyze": analyze_node,
-            "recipe": recipe_node,
+            "guard": guard_node,
             "response": response_node,
-            "chat": chat_node,
-            "dietitian": dietitian_node,
         }
 
         self.graph = self.build_graph()
@@ -48,19 +42,8 @@ class RecipeChatGraph:
         )
 
         graph.add_node(
-            "chat",
-            self.nodes["chat"],
-        )
-
-        graph.add_node(
-            "recipe",
-            self.nodes["recipe"],
-        )
-
-
-        graph.add_node(
-            "dietitian",
-            self.nodes["dietitian"],
+            "guard",
+            self.nodes["guard"],
         )
 
         graph.add_node(
@@ -74,31 +57,19 @@ class RecipeChatGraph:
             "analyze",
         )
 
-        # Routing
-        graph.add_conditional_edges(
+        # Parent runs validation and the branch together
+        graph.add_edge(
             "analyze",
-            self.route_after_analysis,
+            "guard",
+        )
+
+        graph.add_conditional_edges(
+            "guard",
+            self.route_after_guard,
             {
-                "chat": "chat",
-                "recipe": "recipe",
-                "dietitian": "dietitian",
+                "response": "response",
+                "end": END,
             },
-        )
-
-        # All flows eventually go to ResponseNode
-        graph.add_edge(
-            "chat",
-            "response",
-        )
-
-        graph.add_edge(
-            "recipe",
-            "response",
-        )
-
-        graph.add_edge(
-            "dietitian",
-            "response",
         )
 
         graph.add_edge(
@@ -151,18 +122,9 @@ class RecipeChatGraph:
             )
         )
 
-    def route_after_analysis(self,state: GraphState) -> str:
-        analysis = state["analysis"]
-        if analysis is None:
-            return "chat"
+    def route_after_guard(self, state: GraphState) -> str:
+        validation = state.get("validation")
+        if validation is not None and not validation.legitimate:
+            return "end"
 
-        if analysis.intent == "chat":
-            return "chat"
-
-        if analysis.intent == "food":
-            return "recipe"
-
-        if analysis.intent == "dietitian_escort":
-            return "dietitian"
-
-        return "chat"
+        return "response"

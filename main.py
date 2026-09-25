@@ -18,11 +18,13 @@ from Repositories.RecipeEmbeddingRepository import RecipeEmbeddingRepository
 
 # Services
 from Services.MessageAnalyzer import MessageAnalyzer
+from Services.RequestValidator import RequestValidator
 from Services.RecipeSearchService import RecipeSearchService
 from Services.RecipeGenerationService import RecipeGenerationService
 
 # Nodes
 from Nodes.AnalyzeNode import AnalyzeNode
+from Nodes.GuardNode import GuardNode
 from Nodes.RecipeNode import RecipeNode
 from Nodes.ChatNode import ChatNode
 from Nodes.ResponseNode import ResponseNode
@@ -119,6 +121,10 @@ def create_app(checkpointer=None) -> RecipeChatGraph:
         llm=llm
     )
 
+    request_validator = RequestValidator(
+        llm=llm
+    )
+
     recipe_search_service = RecipeSearchService(
         recipe_repository=recipe_repository,
         ingredient_repository=ingredient_repository,
@@ -155,15 +161,20 @@ def create_app(checkpointer=None) -> RecipeChatGraph:
         dietitian_service=DietitianService()
     )
 
+    guard_node = GuardNode(
+        validator=request_validator,
+        chat_node=chat_node,
+        recipe_node=recipe_node,
+        dietitian_node=dietitian_node,
+    )
+
     # --------------------------------
     # 3. Graph
     # --------------------------------
 
     graph = RecipeChatGraph(
         analyze_node=analyze_node,
-        recipe_node=recipe_node,
-        chat_node=chat_node,
-        dietitian_node=dietitian_node,
+        guard_node=guard_node,
         response_node=response_node,
         checkpointer=checkpointer,
     )
@@ -221,7 +232,7 @@ def create_ingest_recipe():
 
 if __name__ == "__main__":
 
-    flag = True
+    flag = False
 
 
     if flag:
@@ -247,7 +258,7 @@ if __name__ == "__main__":
             )
         
     else:
-        path = os.path.join(os.path.dirname(__file__), "Recipes", "recipe2.txt")
+        path = os.path.join(os.path.dirname(__file__), "Recipes", "סלט תירס טרי קראנצ׳י הכי טעים בעולם.txt")
         try:
             with open(path, "r", encoding="utf-8") as file:
                 raw_recipe = file.read()

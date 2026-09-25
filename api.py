@@ -161,7 +161,10 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
                 user_id=user_id,
             )
 
-        reply = result.get("final_response") or ""
+        reply = _with_recipe_images(
+            result.get("final_response") or "",
+            result.get("result"),
+        )
         analysis = result.get("analysis")
 
         logger.info(
@@ -186,6 +189,33 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
             status_code=500,
             detail="Failed to generate response",
         )
+
+
+def _with_recipe_images(reply: str, workflow_result: dict | None) -> str:
+    """Append stored photos. The answer model sometimes drops the URL."""
+    if not workflow_result or workflow_result.get("mode") != "existing":
+        return reply
+
+    blocks = []
+    for recipe in workflow_result.get("recipes") or []:
+        url = recipe.get("image_url")
+        name = recipe.get("name") or "מתכון"
+        if url and url not in reply:
+            blocks.append(f"![{name}]({url})")
+
+    if not blocks:
+        return reply
+
+    return f"{reply}\n\n" + "\n\n".join(blocks)
+
+
+RECIPE_IMAGES = Path(__file__).resolve().parent / "recipe_images"
+if RECIPE_IMAGES.is_dir():
+    app.mount(
+        "/recipe-images",
+        StaticFiles(directory=RECIPE_IMAGES),
+        name="recipe-images",
+    )
 
 
 # Mounted last so it never shadows the API routes above.

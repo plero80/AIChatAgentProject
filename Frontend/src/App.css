@@ -78,7 +78,7 @@ body {
 .stage {
   position: relative;
   z-index: 1;
-  max-width: 820px;
+  max-width: 980px;
   margin: 0 auto;
   display: grid;
   gap: 1.5rem;
@@ -171,7 +171,9 @@ body {
 }
 
 .bubble-alona {
-  align-self: start;
+  align-self: stretch;
+  max-width: 100%;
+  width: 100%;
 }
 
 .bubble-label {
@@ -184,7 +186,7 @@ body {
 .bubble-body {
   padding: 0.85rem 1rem;
   border-radius: 18px;
-  line-height: 1.65;
+  line-height: 1.55;
   font-size: 0.98rem;
   white-space: pre-wrap;
   text-align: start;
@@ -202,32 +204,87 @@ body {
   border: 1px solid var(--line);
   border-end-start-radius: 6px;
   color: var(--ink);
+  white-space: normal;
+  unicode-bidi: isolate;
+  padding: 1.05rem 1.2rem 1.15rem;
 }
 
 .bubble-body p {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.55rem;
 }
 
 .bubble-body p:last-child {
   margin-bottom: 0;
 }
 
+.bubble-body li > p {
+  margin: 0;
+}
+
 .bubble-body ul,
 .bubble-body ol {
-  margin: 0.4rem 0 0.65rem;
-  padding-inline-start: 1.2rem;
+  margin: 0.35rem 0 0.85rem;
+  padding-inline-start: 1.15rem;
+}
+
+.bubble-body ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.28rem 1.4rem;
+  list-style: disc;
+}
+
+.bubble-body ol {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.bubble-body li {
+  line-height: 1.45;
 }
 
 .bubble-body h1,
 .bubble-body h2,
 .bubble-body h3 {
   font-family: var(--font-display);
-  margin: 0.4rem 0 0.5rem;
+  margin: 0.85rem 0 0.4rem;
   line-height: 1.25;
+  color: var(--olive-deep);
+}
+
+.bubble-body h1,
+.bubble-body h2 {
+  font-size: 1.45rem;
+  font-weight: 560;
+}
+
+.bubble-body h3 {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.bubble-body h1:first-child,
+.bubble-body h2:first-child,
+.bubble-body h3:first-child {
+  margin-top: 0.15rem;
+}
+
+.bubble-body img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: 16px;
+  margin: 0.35rem 0 0.9rem;
 }
 
 .bubble-body a {
-  color: var(--olive);
+  color: var(--olive-deep);
+  font-weight: 700;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
 }
 
 .composer {
@@ -341,6 +398,10 @@ body {
 
   .composer button {
     width: 100%;
+  }
+
+  .bubble-body ul {
+    grid-template-columns: 1fr;
   }
 }
 

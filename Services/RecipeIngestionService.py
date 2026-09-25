@@ -1,6 +1,10 @@
+import re
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from Models.RecipeCreate import RecipeCreate
+
+_IMAGES = Path(__file__).resolve().parent.parent / "recipe_images"
 
 
 class RecipeAlreadyExists(Exception):
@@ -37,6 +41,8 @@ class RecipeIngestionService:
         if existing_id is not None:
             raise RecipeAlreadyExists(existing_id, recipe.name)
 
+        _attach_saved_image(recipe)
+
         # Create ONE ID for this recipe
         recipe_id = uuid4()
 
@@ -59,3 +65,17 @@ class RecipeIngestionService:
             )
 
         return recipe_id
+
+
+def _attach_saved_image(recipe: RecipeCreate) -> None:
+    """Use the photo already downloaded for this Instagram post."""
+    if recipe.image_url or not recipe.instagram_url:
+        return
+
+    match = re.search(r"/p/([^/?#]+)", recipe.instagram_url)
+    if match is None:
+        return
+
+    code = match.group(1)
+    if (_IMAGES / f"{code}.jpg").is_file():
+        recipe.image_url = f"/recipe-images/{code}.jpg"

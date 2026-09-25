@@ -11,6 +11,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/health': 'http://127.0.0.1:8000',
+      '/recipe-images': 'http://127.0.0.1:8000',
     },
   },
 })

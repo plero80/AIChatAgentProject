@@ -13,6 +13,7 @@ STATEMENTS = [
         description TEXT,
         instructions TEXT,
         instagram_url TEXT,
+        image_url TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
@@ -33,6 +34,7 @@ STATEMENTS = [
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
+    "ALTER TABLE recipes ADD COLUMN IF NOT EXISTS image_url TEXT",
     "CREATE UNIQUE INDEX IF NOT EXISTS recipes_name_key ON recipes (name)",
     """
     CREATE UNIQUE INDEX IF NOT EXISTS recipes_instagram_url_key

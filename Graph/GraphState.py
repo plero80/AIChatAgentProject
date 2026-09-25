@@ -1,5 +1,6 @@
 from typing_extensions import TypedDict
 from Models.MessageAnalysis import MessageAnalysis
+from Models.RequestValidation import RequestValidation
 from langchain_core.messages import BaseMessage
 from typing import Annotated
 from langgraph.graph.message import add_messages
@@ -16,6 +17,9 @@ class GraphState(TypedDict):
 
     # Result of message understanding
     analysis: MessageAnalysis | None
+
+    # Legitimacy check. None when the checker failed open.
+    validation: RequestValidation | None
 
     # Extra temporary information
     context: dict
