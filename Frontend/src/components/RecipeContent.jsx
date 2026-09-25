@@ -1,4 +1,5 @@
-import ReactMarkdown from 'react-markdown'
+import { useState } from 'react'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import recipeMarkdown, { isInstagramUrl } from './recipeMarkdown'
 import './RecipeContent.css'
 
@@ -32,11 +33,103 @@ function RecipeImage({ src, alt, title }) {
 
 const plugins = [recipeMarkdown]
 const components = { a: MarkdownLink, img: RecipeImage }
+const textComponents = { a: MarkdownLink, img: () => null }
 
-export default function RecipeContent({ content }) {
+function safeRecipeUrl(value) {
+  if (typeof value !== 'string') return null
+  const url = value.trim()
+  if (!url || defaultUrlTransform(url) !== url) return null
+  if ([...url].some(character => character.charCodeAt(0) <= 32 || character === '\\')) return null
+  try {
+    return /^https?:$/i.test(new URL(url, 'https://recipe.local').protocol) ? url : null
+  } catch {
+    return null
+  }
+}
+
+function RecipePhoto({ src, name }) {
+  const [failedSrc, setFailedSrc] = useState(null)
+  if (!src || failedSrc === src) return null
+
+  return (
+    <div className="recipe-card-photos">
+      <img src={src} alt={name} loading="lazy" decoding="async" onError={() => setFailedSrc(src)} />
+    </div>
+  )
+}
+
+function ingredientAmount({ quantity, unit }) {
+  return [quantity, unit]
+    .filter(value => value !== null && value !== undefined && String(value).trim() !== '')
+    .join(' ')
+}
+
+function RecipeCard({ recipe }) {
+  const ingredients = recipe.ingredients ?? []
+  const isHebrew = /[\u0590-\u05ff]/u.test([
+    recipe.name, recipe.description, recipe.instructions,
+    ...ingredients.map(ingredient => ingredient.ingredient_name),
+  ].join(' '))
+  const source = safeRecipeUrl(recipe.instagram_url)
+  const sourceLabel = isInstagramUrl(source)
+    ? (isHebrew ? 'למתכון באינסטגרם' : 'View on Instagram')
+    : (isHebrew ? 'למתכון המקורי' : 'View original recipe')
+
+  return (
+    <article className="recipe-card" data-recipe-id={recipe.id} dir={isHebrew ? 'rtl' : 'ltr'} lang={isHebrew ? 'he' : 'en'}>
+      <header className="recipe-card-heading">
+        <h3 className="recipe-card-title">{recipe.name}</h3>
+        {recipe.description && <p className="recipe-card-description">{recipe.description}</p>}
+      </header>
+      <RecipePhoto src={safeRecipeUrl(recipe.image_url)} name={recipe.name} />
+      <div className="recipe-card-body">
+        {ingredients.length > 0 && (
+          <section className="recipe-ingredients">
+            <h4 className="recipe-section-heading">{isHebrew ? 'המצרכים' : 'Ingredients'}</h4>
+            <ul>
+              {ingredients.map((ingredient, index) => {
+                const amount = ingredientAmount(ingredient)
+                return (
+                  <li key={index}>
+                    {ingredient.ingredient_name}{amount && <> — <bdi>{amount}</bdi></>}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+        {recipe.instructions && (
+          <section className="recipe-method">
+            <h4 className="recipe-section-heading">{isHebrew ? 'הוראות הכנה' : 'Instructions'}</h4>
+            <ReactMarkdown components={textComponents}>{recipe.instructions}</ReactMarkdown>
+          </section>
+        )}
+        {source && (
+          <footer className="recipe-card-source">
+            <MarkdownLink href={source} className="recipe-source-link">{sourceLabel}</MarkdownLink>
+          </footer>
+        )}
+      </div>
+    </article>
+  )
+}
+
+export default function RecipeContent({ content, blocks }) {
   return (
     <div className="recipe-content" dir="auto">
-      <ReactMarkdown remarkPlugins={plugins} components={components}>{content}</ReactMarkdown>
+      {Array.isArray(blocks) ? blocks.map((block, index) => {
+        if (block.type === 'recipe' && block.recipe) {
+          return <RecipeCard key={`${block.recipe.id}-${index}`} recipe={block.recipe} />
+        }
+        if (block.type === 'text') {
+          return (
+            <div className="recipe-text-block" dir="auto" key={index}>
+              <ReactMarkdown components={textComponents}>{block.text}</ReactMarkdown>
+            </div>
+          )
+        }
+        return null
+      }) : <ReactMarkdown remarkPlugins={plugins} components={components}>{content}</ReactMarkdown>}
     </div>
   )
 }

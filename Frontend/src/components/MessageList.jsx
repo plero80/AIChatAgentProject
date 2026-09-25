@@ -23,7 +23,7 @@ export default function MessageList({ messages, isTyping, children }) {
     <div className={`message-list ${messages.length ? '' : 'message-list-empty'}`} ref={listRef} role="log" aria-label="הודעות השיחה" aria-live="polite" aria-relevant="additions" tabIndex={0}>
       {messages.length === 0 ? children : <p className="conversation-start">משהו טוב מתבשל כאן</p>}
       {messages.map((msg) => (
-        <ChatMessage key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} /> : msg.content} />
+        <ChatMessage key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} blocks={msg.blocks} /> : msg.content} />
       ))}
       {isTyping && (
         <div className="typing" role="status">

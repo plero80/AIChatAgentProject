@@ -44,7 +44,7 @@ export default function App() {
       const data = await sendChatMessage(text)
       setMessages((prev) => [
         ...prev,
-        { id: newId(), role: 'assistant', content: data.reply },
+        { id: newId(), role: 'assistant', content: data.reply, blocks: data.blocks },
       ])
     } catch (err) {
       setError(hebrewError(err.message))

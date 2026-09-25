@@ -4,7 +4,8 @@
   line-height: 1.75;
 }
 
-.recipe-content > p {
+.recipe-content > p,
+.recipe-content .recipe-text-block > p {
   margin: 0 0 1rem;
 }
 
@@ -43,6 +44,13 @@
 
 .recipe-content .recipe-card-title strong {
   font-weight: inherit;
+}
+
+.recipe-content .recipe-card-description {
+  margin: .6rem 0 0;
+  color: var(--ink-soft);
+  font-size: .92rem;
+  line-height: 1.65;
 }
 
 .recipe-content .recipe-card-photos {
@@ -140,6 +148,10 @@
 
 .recipe-content .recipe-method {
   margin-top: 1.2rem;
+}
+
+.recipe-content .recipe-method p {
+  white-space: pre-line;
 }
 
 .recipe-content .recipe-method ol {

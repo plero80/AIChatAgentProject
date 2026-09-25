@@ -32,6 +32,7 @@ class GraphState(TypedDict):
 
     # Response
     final_response: str | None
+    response_blocks: list[dict] | None
 
 
 

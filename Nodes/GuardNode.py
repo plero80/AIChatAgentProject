@@ -64,6 +64,7 @@ class GuardNode:
                 "validation": validation,
                 "result": None,
                 "final_response": reason,
+                "response_blocks": [{"type": "text", "text": reason}],
                 "messages": [AIMessage(content=reason)],
             }
         except asyncio.CancelledError:

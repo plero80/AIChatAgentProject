@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field
 
 from Config import settings
 from Logging import configure_logging
+from Models.ChatResponse import ChatResponse
 from RateLimiter import SlidingWindowLimiter
+from Services.RecipePresentationService import build_text_response
 from Session import SESSION_COOKIE, resolve_session_id
 from main import create_app, get_db_conninfo
 
@@ -119,10 +121,6 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
 
 
-class ChatResponse(BaseModel):
-    reply: str
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -161,9 +159,12 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
                 user_id=user_id,
             )
 
-        reply = _with_recipe_images(
-            result.get("final_response") or "",
-            result.get("result"),
+        reply = result.get("final_response") or ""
+        blocks = result.get("response_blocks")
+        presentation = (
+            ChatResponse(reply=reply, blocks=blocks)
+            if blocks is not None
+            else build_text_response(reply)
         )
         analysis = result.get("analysis")
 
@@ -176,7 +177,7 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
             time.monotonic() - started,
         )
 
-        return ChatResponse(reply=reply)
+        return presentation
 
     except Exception:
         logger.exception(
@@ -189,24 +190,6 @@ async def chat(request: ChatRequest, http_request: Request, response: Response):
             status_code=500,
             detail="Failed to generate response",
         )
-
-
-def _with_recipe_images(reply: str, workflow_result: dict | None) -> str:
-    """Append stored photos. The answer model sometimes drops the URL."""
-    if not workflow_result or workflow_result.get("mode") != "existing":
-        return reply
-
-    blocks = []
-    for recipe in workflow_result.get("recipes") or []:
-        url = recipe.get("image_url")
-        name = recipe.get("name") or "מתכון"
-        if url and url not in reply:
-            blocks.append(f"![{name}]({url})")
-
-    if not blocks:
-        return reply
-
-    return f"{reply}\n\n" + "\n\n".join(blocks)
 
 
 RECIPE_IMAGES = Path(__file__).resolve().parent / "recipe_images"
@@ -232,4 +215,3 @@ if FRONTEND_DIST.is_dir():
     )
 else:
     logger.info("No frontend build found at %s; serving API only", FRONTEND_DIST)
-

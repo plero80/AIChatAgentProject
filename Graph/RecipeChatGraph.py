@@ -91,6 +91,13 @@ class RecipeChatGraph:
         initial_state = {
             "user_id": user_id,
             "message": message,
+            # Checkpoints preserve state across turns. Presentation and routing
+            # data belong only to this request; never reuse a previous photo.
+            "analysis": None,
+            "validation": None,
+            "result": None,
+            "final_response": None,
+            "response_blocks": None,
             "messages": [
                 HumanMessage(content=message)
             ],

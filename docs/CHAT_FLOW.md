@@ -16,7 +16,8 @@ Written incrementally. `messages` uses `add_messages` so it **appends**, it does
 | `validation` | `RequestValidation \| None` | `GuardNode` | `legitimate` plus a user-facing `reason` when the request is rejected. `None` if the checker failed and the flow continued |
 | `result` | `dict \| None` | Chat / Recipe / Dietitian, via `GuardNode` | Structured work product for `ResponseNode`. Cleared when the request is rejected |
 | `messages` | `list[BaseMessage]` | `arun` + Guard/Response | Rolling conversation (checkpointer persists it) |
-| `final_response` | `str \| None` | `GuardNode` on reject, else `ResponseNode` | Text returned to the UI |
+| `final_response` | `str \| None` | `GuardNode` on reject, else `ResponseNode` | Complete Markdown for conversation history and older clients |
+| `response_blocks` | `list[dict] \| None` | `GuardNode` on reject, else `ResponseNode` | Ordered text and recipe cards; each recipe includes its own saved image |
 | `context` | `dict` | unused today | Reserved |
 
 ### MessageAnalysis fields
@@ -110,8 +111,8 @@ flowchart TB
   end
 
   subgraph RESP["ResponseNode.__call__"]
-    P["llm.ainvoke(system rules + message + result)<br/>Why: one voice; must present DB recipes as-is<br/>and never say it has no database"]
-    F["Writes final_response + appends AIMessage"]
+    P["Saved recipes: structured recipe ID selection<br/>then canonical cards from database fields.<br/>Other modes: llm.ainvoke for final text"]
+    F["Writes final_response + response_blocks<br/>and appends the displayed answer as AIMessage"]
     P --> F
   end
 
@@ -122,11 +123,29 @@ flowchart TB
   OR2 --> RESP
   DIET --> RESP
 
-  STOP --> OUT["HTTP { reply: final_response }"]
+  STOP --> OUT["HTTP { reply: final_response, blocks: response_blocks }"]
   RESP --> OUT
 ```
 
 ---
+
+## Recipe presentation
+
+For saved recipes, `ResponseNode` asks for a `RecipePresentationPlan` containing
+intro text, explicit recipe IDs, and optional follow-up text. `build_recipe_response`
+selects only those IDs from the search results and copies each recipe's saved name,
+ingredients, instructions, source, and photo into one `recipe` block. Mentioning an
+alternative in prose does not select its photo. Unknown IDs are rejected.
+
+The frontend renders `blocks` directly in order, independently of the model's
+Markdown headings. Text blocks cannot introduce extra photos. Missing photos leave
+the rest of their recipe visible. `reply` contains the same selected recipes as
+Markdown for history and older clients, with photos beside their respective titles;
+the API never appends a gallery of search-result images.
+
+`RecipeChatGraph.arun` clears per-turn analysis, validation, result, and presentation
+fields before each invocation. Conversation messages remain available, while stale
+recipe cards and rejection state cannot carry into the next response.
 
 ## Why routing is intent-only
 
