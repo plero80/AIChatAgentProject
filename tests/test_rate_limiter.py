@@ -1,6 +1,6 @@
 import time
 
-from RateLimiter import SlidingWindowLimiter
+from backend.web.rate_limiter import SlidingWindowLimiter
 
 
 def consume(limiter, key, times):

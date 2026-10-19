@@ -1,12 +1,14 @@
-import api
+import backend.web.api as api
 from fastapi.testclient import TestClient
 
-from Services.RecipePresentationService import build_recipe_response
+from backend.services.chat.recipe_presentation_service import build_recipe_response
 
 
 def request_with_result(monkeypatch, result):
     class Graph:
-        async def arun(self, message, user_id):
+        async def arun(self, request):
+            assert request.message == "אפשר את הטופו?"
+            assert request.user_id
             return result
 
     monkeypatch.setattr(api, "get_graph", lambda: Graph())

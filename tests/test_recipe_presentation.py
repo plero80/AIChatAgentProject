@@ -4,8 +4,8 @@ from decimal import Decimal
 
 import pytest
 
-from Models.ChatResponse import ChatResponse
-from Services.RecipePresentationService import build_recipe_response, build_text_response
+from backend.models.chat_response import ChatResponse
+from backend.services.chat.recipe_presentation_service import build_recipe_response, build_text_response
 
 
 def recipe(recipe_id, name, **overrides):

@@ -1,0 +1,57 @@
+from typing_extensions import TypedDict
+from backend.models.message_analysis import MessageAnalysis
+from backend.models.request_validation import RequestValidation
+from langchain_core.messages import BaseMessage
+from typing import Annotated
+from langgraph.graph.message import add_messages
+
+from uuid import UUID
+
+from backend.models.recipe_create import RecipeCreate
+
+class GraphState(TypedDict):
+    user_id: str
+
+    # Current message
+    message: str
+
+    # Result of message understanding
+    analysis: MessageAnalysis | None
+
+    # Legitimacy check. None when the checker failed open.
+    validation: RequestValidation | None
+
+    # Extra temporary information
+    context: dict
+
+    # Result produced by recipe / chat / intake
+    result: dict | None
+
+    # Conversation
+    messages: Annotated[list[BaseMessage], add_messages]
+
+    # Response
+    final_response: str | None
+    response_blocks: list[dict] | None
+
+
+
+
+class RecipeIngestionState(TypedDict, total=False):
+
+    # INPUT
+    raw_recipe: str
+    instagram_url: str | None
+
+    # Created by AI
+    recipe: RecipeCreate
+
+    # Embedding
+    embedding_text: str
+    embedding: list[float]
+
+    # Database
+    recipe_id: UUID
+
+    success: bool
+    error: str | None

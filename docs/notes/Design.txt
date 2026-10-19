@@ -1,0 +1,57 @@
+
+
+
+
+
+Design that I will say tommorow: 
+
+
+- First I thought about what is going on.
+    - User sends a message and AI Agent replays. 
+
+- So the input is user message and output is AI Agent. 
+
+- I need to deside how do I create the AI agent. 
+
+- Two things came to my mind
+
+- Using an LangSmith Agent and giving it tools and he will decide what to do and how. 
+
+- Second, using a more robust method with more control -> langgraph. 
+
+- I decided to use langgraph. Why ?  
+    - LangSmith did more mistakes, and mostly what lowered the mistakes is using a bigger model which was costly. 
+    - LangGraph, I had more control on the flow and could have use stronger models and pay less. 
+
+
+- The system I built
+
+    - When we start a run, we run an object that create factories for:
+        - graph
+        - services
+
+    - Each factory holds a dictionary that holds all the types and with a config we decide what to run. 
+
+    - The factory also creates clients that we can give to the object. 
+
+    - We can decide in the config which clients for each task. For example response will answer fast. 
+
+    - We used services and put it inisde the nodes, so we can implement different strategies and ID
+
+    - And we use a single state and the nodes each time update it. And it's changes the behaivor of the nodes.
+
+
+- The main graph that we use start in analysis then goes to guard. 
+- The analysis decides what is the intention of the user. 
+- We have 4 options that are related to the client. 
+- They want a recipe. Or they want a new recipe inspired from the recipes. Or a brand new recipe.
+- Or 
+- Or it's want just to chat. 
+- Or it wants to know about the process of suppoting of the dietition. 
+
+
+
+
+
+
+- How did I tested and evaluated thigns ? 

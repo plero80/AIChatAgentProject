@@ -1,0 +1,10 @@
+
+
+
+Design for checkpointer:
+
+
+- We can create a different new table 
+- We can save there the message history
+- The keys can be the user id that we create in the conversations.
+- 

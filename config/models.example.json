@@ -1,0 +1,23 @@
+{
+  "models": {
+    "classifier": {
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "max_tokens": 1000,
+      "reasoning_effort": "none"
+    },
+    "writer": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "max_tokens": 8000
+    }
+  },
+  "assignments": {
+    "message_analyzer": "classifier",
+    "request_validator": "classifier",
+    "recipe_generation": "writer",
+    "recipe_extractor": "classifier",
+    "chat": "writer",
+    "response": "writer"
+  }
+}

@@ -4,9 +4,9 @@ import asyncio
 
 from langchain_core.messages import HumanMessage
 
-from Models.MessageAnalysis import MessageAnalysis
-from Models.RequestValidation import RequestValidation
-from Nodes.GuardNode import FALLBACK_REASON, GuardNode
+from backend.models.message_analysis import MessageAnalysis
+from backend.models.request_validation import RequestValidation
+from backend.nodes.chat.guard_node import FALLBACK_REASON, GuardNode
 
 
 class Validator:

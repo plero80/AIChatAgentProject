@@ -3,8 +3,9 @@ import asyncio
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from Models.RecipePresentationPlan import RecipePresentationPlan
-from Nodes.ResponseNode import ResponseNode
+from backend.models.recipe_presentation_plan import RecipePresentationPlan
+from backend.nodes.chat.response_node import ResponseNode
+from backend.services.chat.recipe_presentation_service import RecipePresentationService
 
 
 def saved_recipe(recipe_id, name):
@@ -56,7 +57,7 @@ def test_only_selected_recipe_has_a_photo_even_when_outro_mentions_another():
     llm = FakeLLM(RecipePresentationPlan(
         intro="הנה המתכון:", recipe_ids=["tofu"], outro="אם תרצי, אפשר גם ספרינג רולס."
     ))
-    result = asyncio.run(ResponseNode(llm)(recipe_state()))
+    result = asyncio.run(ResponseNode(llm, RecipePresentationService())(recipe_state()))
 
     cards = [block["recipe"] for block in result["response_blocks"] if block["type"] == "recipe"]
     assert [card["id"] for card in cards] == ["tofu"]
@@ -71,7 +72,7 @@ def test_only_selected_recipe_has_a_photo_even_when_outro_mentions_another():
 
 def test_selected_recipe_order_is_explicit_and_not_search_order():
     llm = FakeLLM(RecipePresentationPlan(intro="", recipe_ids=["rolls", "tofu"], outro=""))
-    result = asyncio.run(ResponseNode(llm)(recipe_state()))
+    result = asyncio.run(ResponseNode(llm, RecipePresentationService())(recipe_state()))
     cards = [block["recipe"] for block in result["response_blocks"] if block["type"] == "recipe"]
     assert [card["id"] for card in cards] == ["rolls", "tofu"]
     assert [card["image_url"] for card in cards] == ["/recipe-images/rolls.jpg", "/recipe-images/tofu.jpg"]
@@ -79,7 +80,7 @@ def test_selected_recipe_order_is_explicit_and_not_search_order():
 
 def test_short_answer_does_not_display_any_candidate_photos():
     llm = FakeLLM(RecipePresentationPlan(intro="בטופו יש 300 גרם.", recipe_ids=[], outro=""))
-    result = asyncio.run(ResponseNode(llm)(recipe_state()))
+    result = asyncio.run(ResponseNode(llm, RecipePresentationService())(recipe_state()))
     assert result["response_blocks"] == [{"type": "text", "text": "בטופו יש 300 גרם."}]
     assert "recipe-images" not in result["final_response"]
 
@@ -87,7 +88,7 @@ def test_short_answer_does_not_display_any_candidate_photos():
 def test_unknown_selection_is_rejected_instead_of_attaching_another_photo():
     llm = FakeLLM(RecipePresentationPlan(intro="", recipe_ids=["not-a-candidate"], outro=""))
     with pytest.raises(ValueError):
-        asyncio.run(ResponseNode(llm)(recipe_state()))
+        asyncio.run(ResponseNode(llm, RecipePresentationService())(recipe_state()))
 
 
 def test_text_response_replaces_previous_recipe_blocks():
@@ -95,7 +96,7 @@ def test_text_response_replaces_previous_recipe_blocks():
     state["result"] = {"mode": "chat", "text": "בשמחה!"}
     state["response_blocks"] = [{"type": "recipe", "recipe": saved_recipe("old", "ישן")}]
     llm = FakeLLM(text="בשמחה!")
-    result = asyncio.run(ResponseNode(llm)(state))
+    result = asyncio.run(ResponseNode(llm, RecipePresentationService())(state))
     assert result["response_blocks"] == [{"type": "text", "text": "בשמחה!"}]
     assert not llm.structured_calls
 

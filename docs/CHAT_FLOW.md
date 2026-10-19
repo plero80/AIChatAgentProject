@@ -40,7 +40,7 @@ flowchart TB
     UI["Frontend sendChatMessage(message)<br/>credentials: include"]
     COOKIE["resolve_session_id(cookie alona_session)<br/>reject non-UUID → new uuid4"]
     RL["enforce_rate_limits(user_id, client_ip)<br/>15/min user · 40/min IP"]
-    ARUN["RecipeChatGraph.arun(message, user_id)<br/>initial_state: user_id, message,<br/>messages=[HumanMessage]<br/>config.thread_id = user_id"]
+    ARUN["RecipeChatGraph.arun(ChatGraphRequest(message, user_id))<br/>initial_state: user_id, message,<br/>messages=[HumanMessage]<br/>config.thread_id = user_id"]
     UI --> COOKIE --> RL --> ARUN
   end
 
@@ -105,7 +105,7 @@ flowchart TB
   EX -.-> SEARCH
 
   subgraph DIET["DietitianNode.__call__"]
-    D1["DietitianService.get_dietitian_url()<br/>reads Url_docs/url_answer_escort.txt"]
+    D1["DietitianService.get_dietitian_url()<br/>reads data/links/url_answer_escort.txt"]
     D2["result = {mode: dietitian_escort, text}"]
     D1 --> D2
   end

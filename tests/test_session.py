@@ -1,4 +1,4 @@
-from Session import resolve_session_id
+from backend.web.session import resolve_session_id
 
 
 def test_missing_cookie_issues_a_new_uuid():

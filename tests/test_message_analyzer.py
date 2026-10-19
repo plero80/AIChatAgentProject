@@ -2,8 +2,8 @@
 
 import pytest
 
-from Models.MessageAnalysis import MessageAnalysis
-from Services.MessageAnalyzer import MessageAnalyzer
+from backend.models.message_analysis import MessageAnalysis
+from backend.services.chat.message_analyzer import MessageAnalyzer
 
 
 @pytest.fixture

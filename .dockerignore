@@ -9,3 +9,9 @@ Frontend/node_modules
 Frontend/dist
 *.md
 .cursor
+.pytest_cache
+.vscode
+tmp
+output
+docs
+tests

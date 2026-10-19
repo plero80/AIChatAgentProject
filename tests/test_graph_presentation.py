@@ -2,10 +2,12 @@ import asyncio
 
 from langchain_core.messages import AIMessage
 
-from Graph.RecipeChatGraph import RecipeChatGraph
-from Models.MessageAnalysis import MessageAnalysis
-from Models.RequestValidation import RequestValidation
-from Nodes.GuardNode import GuardNode
+from backend.graphs.recipe_chat_graph import RecipeChatGraph
+from backend.graphs.graph_requests import ChatGraphRequest
+from backend.graphs.recipe_chat_nodes import RecipeChatNodes
+from backend.models.message_analysis import MessageAnalysis
+from backend.models.request_validation import RequestValidation
+from backend.nodes.chat.guard_node import GuardNode
 
 
 def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
@@ -40,21 +42,25 @@ def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
             return {"final_response": text, "response_blocks": blocks, "messages": [AIMessage(content=text)]}
 
     branch = Branch()
-    graph = RecipeChatGraph(
-        analyze_node=Analyze(),
-        guard_node=GuardNode(Validator(), branch, branch, branch),
-        response_node=Response(),
+    nodes = RecipeChatNodes(
+        analysis=Analyze(),
+        guard=GuardNode(Validator(), branch, branch, branch),
+        response=Response(),
+        chat=branch,
+        recipe=branch,
+        dietitian=branch,
     )
+    graph = RecipeChatGraph(nodes=nodes)
 
     async def conversation():
-        first = await graph.arun("recipe", "one-session")
+        first = await graph.arun(ChatGraphRequest("recipe", "one-session"))
         assert first["response_blocks"][0]["type"] == "recipe"
 
-        rejected = await graph.arun("reject", "one-session")
+        rejected = await graph.arun(ChatGraphRequest("reject", "one-session"))
         assert rejected["response_blocks"] == [{"type": "text", "text": "לא קשור למטבח"}]
         assert "tofu.jpg" not in str(rejected["response_blocks"])
 
-        final = await graph.arun("follow-up", "one-session")
+        final = await graph.arun(ChatGraphRequest("follow-up", "one-session"))
         assert final["final_response"] == "follow-up"
         assert final["response_blocks"] == [{"type": "text", "text": "follow-up"}]
         assert final["validation"] is None
