@@ -44,7 +44,7 @@ class RecipeSearchService(BaseRecipeSearchService):
             self.embedding_model.aembed_query(user_text),
         )
 
-        # If no ingredient hits, still rank by semantic similarity across all recipes
+        # Without ingredient hits, rank by similarity within this dietitian's recipes.
         ranked = await asyncio.to_thread(
             self.embedding_repository.find_most_similar_recipes,
             query_embedding,

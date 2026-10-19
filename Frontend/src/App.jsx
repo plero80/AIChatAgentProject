@@ -1,17 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { sendChatMessage } from './api'
+import { loadDeploymentConfig } from './components/deploymentConfig'
 import ChatInput from './components/ChatInput'
 import MessageList from './components/MessageList'
 import Icon from './components/Icon'
-import tofuPhoto from '../../recipe_images/Db3SxwotrQg.jpg'
-import rollsPhoto from '../../recipe_images/DcN4D3AN1Ng.jpg'
 import './App.css'
 
-const starters = [
-  { icon: 'leaf', label: 'משהו עם טופו', message: 'יש לי טופו. איזה מתכון של אלונה אפשר להכין?' },
-  { icon: 'bowl', label: 'ארוחה עשירה בחלבון', message: 'אני מחפשת מתכון לארוחה עשירה בחלבון' },
-  { icon: 'sparkles', label: 'לבשל עם מה שיש', message: 'תעזרי לי למצוא מתכון לפי המצרכים שיש לי בבית' },
-]
 
 function hebrewError(message) {
   if (message?.includes('Too many') || message?.includes('429')) {
@@ -32,9 +26,25 @@ export default function App() {
   const [isTyping, setIsTyping] = useState(false)
   const [error, setError] = useState(null)
   const sendingRef = useRef(false)
+  const [config, setConfig] = useState(null)
+  const [configError, setConfigError] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    loadDeploymentConfig(controller.signal).then((profile) => {
+      if (controller.signal.aborted) return
+      setConfig(profile)
+      document.title = profile.title
+      document.querySelector('meta[name="description"]')?.setAttribute('content', profile.welcome)
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', profile.accent_color)
+    }).catch(() => {
+      if (!controller.signal.aborted) setConfigError(true)
+    })
+    return () => controller.abort()
+  }, [])
 
   async function handleSend(text) {
-    if (sendingRef.current || !text.trim()) return
+    if (!config || sendingRef.current || !text.trim()) return
     sendingRef.current = true
     setError(null)
     setMessages((prev) => [...prev, { id: newId(), role: 'user', content: text }])
@@ -54,13 +64,20 @@ export default function App() {
     }
   }
 
+  if (!config) {
+    return <main className="config-status" dir="rtl" lang="he" role={configError ? 'alert' : 'status'}>
+      <p>{configError ? 'לא הצלחנו לטעון את המטבח. נסי לרענן את העמוד.' : 'טוענים את המטבח…'}</p>
+      {configError && <button onClick={() => window.location.reload()}>נסי שוב</button>}
+    </main>
+  }
+
   return (
-    <div className="shell" dir="rtl" lang="he">
+    <div className="shell" dir="rtl" lang="he" style={{ '--olive': config.accent_color }}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-symbol"><Icon name="leaf" /></span>
           <div className="brand-lockup">
-            <span className="brand-name" lang="en" dir="ltr">Alona<span>.</span></span>
+            <span className="brand-name" lang="en" dir="ltr">{config.brand_name}<span>.</span></span>
             <span className="brand-caption">העוזרת שלך במטבח</span>
           </div>
         </div>
@@ -70,40 +87,38 @@ export default function App() {
       <main className="stage">
         <aside className="kitchen-sidebar" aria-label="השראה למטבח">
           <div className="sidebar-intro">
-            <span className="eyebrow"><span className="small-rule" /> מהמטבח של אלונה</span>
+            <span className="eyebrow"><span className="small-rule" /> {config.title}</span>
             <h1>משהו טעים<br />מתחיל <span>בשיחה.</span></h1>
             <p>מתכונים שאוהבים, מצרכים שכבר יש בבית וקצת השראה לארוחה הבאה.</p>
           </div>
-          <div className="sidebar-recipes">
+          {config.inspiration.length > 0 && <div className="sidebar-recipes">
             <p className="sidebar-section-label">רעיון קטן להתחלה</p>
-            <button className="inspiration-card" onClick={() => handleSend('אפשר את המתכון של אלונה לטופו חמאת בוטנים?')} disabled={isTyping}>
-              <img src={tofuPhoto} alt="" />
-              <span className="inspiration-text"><span>טופו חמאת בוטנים</span><small>למתכון של אלונה <Icon name="arrow" /></small></span>
-            </button>
-            <button className="inspiration-card" onClick={() => handleSend('אפשר את המתכון של אלונה לספרינג רולס ברוטב חמאת בוטנים?')} disabled={isTyping}>
-              <img src={rollsPhoto} alt="" />
-              <span className="inspiration-text"><span>ספרינג רולס</span><small>למתכון של אלונה <Icon name="arrow" /></small></span>
-            </button>
-          </div>
+            {config.inspiration.map((recipe) => (
+              <button key={recipe.image} className="inspiration-card" onClick={() => handleSend(recipe.message)} disabled={isTyping}>
+                <img src={`/recipe-images/${recipe.image}`} alt="" />
+                <span className="inspiration-text"><span>{recipe.label}</span><small>למתכון <Icon name="arrow" /></small></span>
+              </button>
+            ))}
+          </div>}
           <p className="sidebar-footer"><Icon name="bowl" /> מהמטבח, באהבה.</p>
         </aside>
 
-        <section className="chat-panel" aria-label="צ׳אט עם אלונה">
+        <section className="chat-panel" aria-label={config.title}>
           <header className="chat-header">
             <span className="assistant-avatar"><Icon name="leaf" /></span>
-            <div><h2>המטבח של אלונה</h2><p>מוצאות יחד את הביס הבא</p></div>
+            <div><h2>{config.title}</h2><p>{config.subtitle}</p></div>
             <span className="chat-header-tag">נעים לבשל יחד</span>
           </header>
-          <MessageList messages={messages} isTyping={isTyping}>
+          <MessageList messages={messages} isTyping={isTyping} assistantName={config.assistant_name}>
             <div className="welcome">
               <div className="welcome-illustration" aria-hidden="true"><Icon name="bowl" /><span><Icon name="sparkles" /></span></div>
               <p className="eyebrow">ברוכה הבאה למטבח</p>
               <h2>מה מתחשק לך להכין?</h2>
-              <p className="welcome-description">היי, אני העוזרת של אלונה.<br />ספרי לי מה יש במקרר, מה בא לך לאכול, או איזה מתכון את מחפשת.</p>
+              <p className="welcome-description">{config.welcome}</p>
               <div className="starter-prompts">
-                {starters.map((starter) => (
+                {config.starters.map((starter) => (
                   <button key={starter.label} onClick={() => handleSend(starter.message)} disabled={isTyping}>
-                    <Icon name={starter.icon} /><span>{starter.label}</span><Icon name="arrow" />
+                    <Icon name="leaf" /><span>{starter.label}</span><Icon name="arrow" />
                   </button>
                 ))}
               </div>
@@ -114,7 +129,7 @@ export default function App() {
           <ChatInput onSend={handleSend} disabled={isTyping} />
         </section>
       </main>
-      <footer className="page-footer">מתכונים מהמטבח, לא מהאוויר.<span lang="en" dir="ltr">ALONA’S KITCHEN</span></footer>
+      <footer className="page-footer">מתכונים מהמטבח, לא מהאוויר.<span lang="en" dir="ltr">{config.footer}</span></footer>
     </div>
   )
 }

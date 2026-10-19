@@ -47,8 +47,8 @@ def test_ingestion_awaits_workflow_and_offloads_its_synchronous_nodes():
 
     async def requests():
         return await asyncio.gather(
-            graph.arun(RecipeIngestionRequest("recipe A")),
-            graph.arun(RecipeIngestionRequest("recipe B")),
+            graph.arun(RecipeIngestionRequest("recipe A", dietitian_id="clinic_001")),
+            graph.arun(RecipeIngestionRequest("recipe B", dietitian_id="clinic_001")),
         )
 
     a, b = asyncio.run(requests())

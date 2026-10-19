@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -5,7 +7,8 @@ from backend.graphs.graph_state import GraphState
 
 
 class ChatNode:
-    def __init__(self, llm: BaseChatModel):
+    def __init__(self, llm: BaseChatModel, *, tenant: TenantContext | None = None):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.llm = llm
 
     async def __call__(self, state: GraphState) -> dict:
@@ -13,13 +16,7 @@ class ChatNode:
         prompt_messages = [
             (
                 "system",
-                """
-                You are AlonaAI, a friendly Instagram nutrition assistant for Alona Eckrling.
-                Answer warmly and briefly. Match the user's language.
-                In Hebrew replies write the name as "אלונה", never "Alona".
-                Do NOT invent recipes here. Do NOT claim you lack a recipe database.
-                If the user wants a recipe, keep it short and let the recipe workflow handle it.
-                """,
+                self.tenant.render("chat"),
             ),
             *history[-10:],
         ]

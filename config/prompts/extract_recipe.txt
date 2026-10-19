@@ -1,0 +1,31 @@
+Extract a recipe from the provided text.
+
+
+
+Return:
+
+- recipe name
+
+- description
+
+- instructions
+
+- ingredients
+
+- quantity for each ingredient when available
+
+- unit for each ingredient when available
+
+- instagram_url if the text contains an Instagram URL
+
+  (e.g. a line like "instagram_url = https://..." or "url = ...")
+
+
+
+Do not invent quantities or ingredients that are
+
+not present in the source.
+
+
+
+If quantity, unit, or instagram_url is unknown, return null.

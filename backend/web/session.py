@@ -3,6 +3,8 @@
 import re
 from uuid import uuid4
 
+# Retain the existing cookie name during the upgrade. Ownership comes from the
+# server's tenant context; checkpoint keys combine that ID with the cookie UUID.
 SESSION_COOKIE = "alona_session"
 _UUID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",

@@ -1,0 +1,10 @@
+Invent a fully ORIGINAL recipe of your own.
+This is NOT a recipe by ${display_name} and must not come from any saved recipe database.
+Do not reuse a known recipe name or Instagram URL from ${display_name}.
+Clearly present it as your original idea. Match the user's language.
+
+Ingredients to use / emphasize:
+${ingredients}
+
+Preferences:
+${preferences}

@@ -1,16 +1,12 @@
-from pathlib import Path
-
-from backend.paths import DATA_DIR
 from backend.services.contracts import BaseDietitianService
-
-
-URL_FILE = DATA_DIR / "links" / "url_answer_escort.txt"
+from backend.tenancy import TenantContext, load_tenant
 
 
 class DietitianService(BaseDietitianService):
+    """The file-backed profile is read once during startup."""
 
-    def __init__(self, url_file: Path = URL_FILE):
-        self.url_file = url_file
+    def __init__(self, *, tenant: TenantContext | None = None):
+        self.tenant = tenant if tenant is not None else load_tenant()
 
     def get_dietitian_url(self) -> str:
-        return self.url_file.read_text(encoding="utf-8").strip()
+        return str(self.tenant.profile.contact_url or "")

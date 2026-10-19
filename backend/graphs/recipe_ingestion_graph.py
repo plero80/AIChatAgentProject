@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 # Graph/RecipeIngestionGraph.py
 
 from typing import TYPE_CHECKING
@@ -26,7 +28,9 @@ class RecipeIngestionGraph(BaseGraph[RecipeIngestionRequest, RecipeIngestionStat
         embedding_node: EmbeddingNode,
         persist_node: PersistRecipeNode,
         model_registry: "ModelRegistry | None" = None,
+        tenant: TenantContext | None = None,
     ):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.model_registry = model_registry
         self.extract_node = extract_node
         self.prepare_embedding_node = prepare_embedding_node
@@ -89,6 +93,9 @@ class RecipeIngestionGraph(BaseGraph[RecipeIngestionRequest, RecipeIngestionStat
         return builder.compile()
 
     async def arun(self, request: RecipeIngestionRequest) -> RecipeIngestionState:
+        if request.dietitian_id != self.tenant.dietitian_id:
+            raise ValueError("Request dietitian does not match this graph deployment")
         return await self.graph.ainvoke({
             "raw_recipe": request.raw_recipe,
+            "dietitian_id": request.dietitian_id,
         })

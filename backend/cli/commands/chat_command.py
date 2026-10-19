@@ -1,3 +1,5 @@
+from backend.tenancy import load_tenant
+
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
 from uuid import uuid4
@@ -17,6 +19,7 @@ class ChatCommand(BaseCommand):
         parser.add_argument("--user-id", help="Conversation ID; defaults to a new ID for this session")
 
     async def run(self, args: Namespace) -> int:
+        tenant = load_tenant()
         graph = self.graph_factory()
         user_id = args.user_id or str(uuid4())
         while True:
@@ -28,5 +31,5 @@ class ChatCommand(BaseCommand):
                 return 0
             if not message:
                 continue
-            result = await graph.arun(ChatGraphRequest(message=message, user_id=user_id))
-            print("Alona:", result["final_response"])
+            result = await graph.arun(ChatGraphRequest(message=message, user_id=user_id, dietitian_id=tenant.dietitian_id))
+            print(f"{tenant.profile.branding.brand_name}:", result["final_response"])

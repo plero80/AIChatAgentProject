@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 import asyncio
 import logging
 
@@ -8,9 +10,7 @@ from backend.models.request_validation import RequestValidation
 from backend.services.contracts import BaseRequestValidator
 
 
-logger = logging.getLogger("alona.guard")
-
-FALLBACK_REASON = "אני יכולה לעזור רק עם מתכונים, בישול ותזונה של אלונה."
+logger = logging.getLogger(__name__)
 
 
 class GuardNode:
@@ -26,7 +26,9 @@ class GuardNode:
         chat_node,
         recipe_node,
         dietitian_node,
+        *, tenant: TenantContext | None = None,
     ):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.validator = validator
         self.branches = {
             "chat": chat_node,
@@ -58,7 +60,7 @@ class GuardNode:
                 return update
 
             await _discard(branch_task)
-            reason = (validation.reason or "").strip() or FALLBACK_REASON
+            reason = (validation.reason or "").strip() or self.tenant.render("refusal")
             logger.info("Rejected request")
             return {
                 "validation": validation,

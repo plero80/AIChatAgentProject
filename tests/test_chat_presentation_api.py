@@ -1,5 +1,6 @@
 import backend.web.api as api
 from fastapi.testclient import TestClient
+from backend.tenancy import load_tenant
 
 from backend.services.chat.recipe_presentation_service import build_recipe_response
 
@@ -11,7 +12,8 @@ def request_with_result(monkeypatch, result):
             assert request.user_id
             return result
 
-    monkeypatch.setattr(api, "get_graph", lambda: Graph())
+    monkeypatch.setattr(api, "get_graph", lambda request: Graph())
+    monkeypatch.setattr(api, "get_tenant", lambda request: load_tenant())
     monkeypatch.setattr(api, "enforce_rate_limits", lambda *_: None)
     # No lifespan context: use the fake graph without starting database pools.
     client = TestClient(api.app)

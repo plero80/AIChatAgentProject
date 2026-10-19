@@ -53,14 +53,14 @@ def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
     graph = RecipeChatGraph(nodes=nodes)
 
     async def conversation():
-        first = await graph.arun(ChatGraphRequest("recipe", "one-session"))
+        first = await graph.arun(ChatGraphRequest("recipe", "one-session", dietitian_id="clinic_001"))
         assert first["response_blocks"][0]["type"] == "recipe"
 
-        rejected = await graph.arun(ChatGraphRequest("reject", "one-session"))
+        rejected = await graph.arun(ChatGraphRequest("reject", "one-session", dietitian_id="clinic_001"))
         assert rejected["response_blocks"] == [{"type": "text", "text": "לא קשור למטבח"}]
         assert "tofu.jpg" not in str(rejected["response_blocks"])
 
-        final = await graph.arun(ChatGraphRequest("follow-up", "one-session"))
+        final = await graph.arun(ChatGraphRequest("follow-up", "one-session", dietitian_id="clinic_001"))
         assert final["final_response"] == "follow-up"
         assert final["response_blocks"] == [{"type": "text", "text": "follow-up"}]
         assert final["validation"] is None

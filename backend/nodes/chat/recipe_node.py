@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 from backend.graphs.graph_state import GraphState
 from backend.models.recipe_plan import RecipePlan
 from backend.services.contracts import BaseRecipeGenerationService, BaseRecipeSearchService
@@ -9,7 +11,9 @@ class RecipeNode:
         self,
         recipe_generation_service: BaseRecipeGenerationService,
         recipe_search_service: BaseRecipeSearchService,
+        *, tenant: TenantContext | None = None,
     ):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.recipe_generation_service = recipe_generation_service
         self.recipe_search_service = recipe_search_service
 
@@ -36,10 +40,7 @@ class RecipeNode:
                     "result": {
                         "mode": "not_found",
                         "recipes": [],
-                        "message": (
-                            "No matching Alona recipe was found in the database "
-                            "for this request. Do not invent a recipe."
-                        ),
+                        "message": self.tenant.render("recipe_not_found"),
                     }
                 }
             return {

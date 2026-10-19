@@ -82,14 +82,14 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 3px s
 
 .bubble { min-width: 0; flex-shrink: 0; display: flex; flex-direction: column; gap: 9px; }
 .bubble-user { align-self: flex-start; max-width: 82%; }
-.bubble-alona { align-self: stretch; }
+.bubble-assistant { align-self: stretch; }
 .bubble-label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); }
 .bubble-user .bubble-label { padding-inline-start: 4px; }
 .message-avatar { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; color: #71845d; background: #eef2e7; }
 .message-avatar .icon { width: 16px; height: 16px; }
 .bubble-body { font-size: 16px; line-height: 1.75; text-align: start; overflow-wrap: anywhere; min-width: 0; }
 .bubble-user .bubble-body { white-space: pre-wrap; background: var(--olive); color: #fff; padding: 11px 17px; border-radius: 16px 4px 16px 16px; }
-.bubble-alona .bubble-body { color: var(--ink); }
+.bubble-assistant .bubble-body { color: var(--ink); }
 .typing { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); padding-block: 4px; flex-shrink: 0; }
 .typing-dots { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 3px; }
 .typing-dots > span { width: 4px; height: 4px; border-radius: 50%; background: #81936f; animation: pulse 1.2s ease-in-out infinite; }
@@ -152,3 +152,5 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 3px s
 }
 @media (max-height: 650px) and (min-width: 851px) { .topbar { min-height: 76px; } .kitchen-sidebar { padding-top: 10px; } .sidebar-intro h1 { font-size: 36px; margin-block: 15px; } .sidebar-recipes { margin-top: 20px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.config-status { min-height: 100dvh; display: grid; place-content: center; text-align: center; gap: 1rem; }

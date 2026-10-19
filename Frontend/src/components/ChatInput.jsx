@@ -30,7 +30,7 @@ export default function ChatInput({ onSend, disabled }) {
   return (
     <form className="composer" onSubmit={submit} aria-label="כתיבת הודעה">
       <div className="composer-field">
-        <textarea ref={inputRef} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder="מה יש לך במקרר? מה בא לך להכין?" rows={1} aria-label="הודעה לאלונה" aria-describedby="composer-hint" dir="auto" />
+        <textarea ref={inputRef} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder="מה יש לך במקרר? מה בא לך להכין?" rows={1} aria-label="הודעה לעוזרת" aria-describedby="composer-hint" dir="auto" />
         <button type="submit" disabled={disabled || !value.trim()} aria-label="שליחת הודעה"><Icon name="send" /></button>
       </div>
       <div className="composer-footer" id="composer-hint"><span>קצת מצרכים, ונמצא יחד רעיון.</span><span className="keyboard-hint">Enter לשליחה <span>·</span> Shift + Enter לשורה חדשה</span></div>

@@ -9,7 +9,7 @@ from backend.services.chat.message_analyzer import MessageAnalyzer
 @pytest.fixture
 def analyzer():
     # _apply_mode_overrides is pure, so no LLM is needed
-    return MessageAnalyzer.__new__(MessageAnalyzer)
+    return MessageAnalyzer(llm=None)
 
 
 def analysis(intent="food", recipe_mode="existing"):

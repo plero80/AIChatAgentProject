@@ -1,3 +1,5 @@
+from backend.tenancy import load_tenant
+
 import sys
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
@@ -28,8 +30,9 @@ class IngestCommand(BaseCommand):
             print(f"Recipe file is empty: {args.file}", file=sys.stderr)
             return 1
 
+        tenant = load_tenant()
         graph = self.graph_factory()
-        result = await graph.arun(RecipeIngestionRequest(raw_recipe=raw_recipe))
+        result = await graph.arun(RecipeIngestionRequest(raw_recipe=raw_recipe, dietitian_id=tenant.dietitian_id))
         if not result.get("success"):
             print(result.get("error") or "Recipe ingestion failed", file=sys.stderr)
             return 1

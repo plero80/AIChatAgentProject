@@ -1,4 +1,6 @@
-# Alona chat — exact runtime flow
+# Dietitian chat — exact runtime flow
+
+The dietitian is selected once per deployment. See [deployment configuration](DIETITIAN_DEPLOYMENTS.md).
 
 This is the path of one `POST /chat` request. Node names are LangGraph keys. Methods are the real callables.
 
@@ -15,6 +17,7 @@ Written incrementally. `messages` uses `add_messages` so it **appends**, it does
 | `analysis` | `MessageAnalysis \| None` | `AnalyzeNode` | Intent + recipe mode + ingredients |
 | `validation` | `RequestValidation \| None` | `GuardNode` | `legitimate` plus a user-facing `reason` when the request is rejected. `None` if the checker failed and the flow continued |
 | `result` | `dict \| None` | Chat / Recipe / Dietitian, via `GuardNode` | Structured work product for `ResponseNode`. Cleared when the request is rejected |
+| `dietitian_id` | `str` | Startup context / `arun` | Ownership and history namespace |
 | `messages` | `list[BaseMessage]` | `arun` + Guard/Response | Rolling conversation (checkpointer persists it) |
 | `final_response` | `str \| None` | `GuardNode` on reject, else `ResponseNode` | Complete Markdown for conversation history and older clients |
 | `response_blocks` | `list[dict] \| None` | `GuardNode` on reject, else `ResponseNode` | Ordered text and recipe cards; each recipe includes its own saved image |
@@ -40,7 +43,7 @@ flowchart TB
     UI["Frontend sendChatMessage(message)<br/>credentials: include"]
     COOKIE["resolve_session_id(cookie alona_session)<br/>reject non-UUID → new uuid4"]
     RL["enforce_rate_limits(user_id, client_ip)<br/>15/min user · 40/min IP"]
-    ARUN["RecipeChatGraph.arun(ChatGraphRequest(message, user_id))<br/>initial_state: user_id, message,<br/>messages=[HumanMessage]<br/>config.thread_id = user_id"]
+    ARUN["RecipeChatGraph.arun(ChatGraphRequest(message, user_id, dietitian_id))<br/>initial_state: user_id, message,<br/>messages=[HumanMessage]<br/>config.thread_id = dietitian_id:user_id"]
     UI --> COOKIE --> RL --> ARUN
   end
 
@@ -105,7 +108,7 @@ flowchart TB
   EX -.-> SEARCH
 
   subgraph DIET["DietitianNode.__call__"]
-    D1["DietitianService.get_dietitian_url()<br/>reads data/links/url_answer_escort.txt"]
+    D1["DietitianService.get_dietitian_url()<br/>uses startup profile.contact_url"]
     D2["result = {mode: dietitian_escort, text}"]
     D1 --> D2
   end

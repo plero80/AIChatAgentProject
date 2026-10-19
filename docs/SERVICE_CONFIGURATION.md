@@ -1,5 +1,8 @@
 # Project organization and configuration
 
+For deployment identity, prompt files, database migration, and separate clinic
+frontends, see [Dietitian deployments](DIETITIAN_DEPLOYMENTS.md).
+
 Application code lives in the `backend` package. Python modules use lowercase
 snake_case filenames; class names such as `RecipeChatGraph` remain the same.
 
@@ -9,6 +12,7 @@ run_api.py                    HTTP server launcher (also used by Docker)
 backend/
   bootstrap.py                Creates services, nodes, and the selected graphs
   paths.py                    Absolute paths to project configuration and data
+  tenancy.py                  Immutable dietitian profile and prompt snapshot
   config/                     Settings and validated configuration classes
   cli/                        Argument parsing and chat/ingest commands
   web/                        FastAPI endpoints, sessions, and rate limits
@@ -27,10 +31,11 @@ backend/
   logging_config.py           Logging configuration
 Frontend/                     React interface
 config/                       services.json, models.json, models.example.json
+  dietitians/<id>/            Per-dietitian profile.json and prompt overrides
+  prompts/                    Shared text prompt templates
 data/
   recipes/                    Source recipe text files for ingestion
-  recipe_images/              Images served at the existing /recipe-images URL
-  links/                      Dietitian contact URL
+  dietitians/<id>/recipe_images/  Images served only by their owning deployment
 tests/                        Automated Python tests
 docs/
   notes/                      Existing design notes, preserved as written
@@ -130,10 +135,14 @@ frozen dataclasses in `backend/graphs/graph_requests.py`:
 from backend.graphs.graph_requests import ChatGraphRequest, RecipeIngestionRequest
 
 chat = create_app()
-reply = await chat.arun(ChatGraphRequest(message="Hi!", user_id="user-a"))
+reply = await chat.arun(ChatGraphRequest(
+    message="Hi!", user_id="user-a", dietitian_id=chat.tenant.dietitian_id,
+))
 
 ingestion = create_ingest_recipe()
-saved = await ingestion.arun(RecipeIngestionRequest(raw_recipe="Recipe text..."))
+saved = await ingestion.arun(RecipeIngestionRequest(
+    raw_recipe="Recipe text...", dietitian_id=ingestion.tenant.dietitian_id,
+))
 ```
 
 In synchronous code, use `chat.run(ChatGraphRequest(...))` or
@@ -187,15 +196,15 @@ are errors. Keep credentials in environment variables, not in this JSON file.
 
 | Service key | Environment variable | Current type | Dependencies supplied to its builder |
 | --- | --- | --- | --- |
-| `chat_graph` | `CHAT_GRAPH_TYPE` | `recipe` | `nodes` (`RecipeChatNodes`), `checkpointer`, `model_registry` |
+| `chat_graph` | `CHAT_GRAPH_TYPE` | `recipe` | `nodes` (`RecipeChatNodes`), `checkpointer`, `model_registry`, `tenant` |
 | `chat_model` (implicit default profile provider) | `CHAT_MODEL_TYPE` | `openai` | `profile` (`ModelProfile`) |
-| `message_analyzer` | `MESSAGE_ANALYZER_TYPE` | `llm` | `llm` |
-| `request_validator` | `REQUEST_VALIDATOR_TYPE` | `llm` | `llm` |
+| `message_analyzer` | `MESSAGE_ANALYZER_TYPE` | `llm` | `llm`, `tenant` |
+| `request_validator` | `REQUEST_VALIDATOR_TYPE` | `llm` | `llm`, `tenant` |
 | `recipe_search` | `RECIPE_SEARCH_TYPE` | `postgres` | `recipe_repository`, `ingredient_repository`, `embedding_repository`, `embedding_model` |
-| `recipe_generation` | `RECIPE_GENERATION_TYPE` | `llm` | `llm` |
-| `recipe_extractor` | `RECIPE_EXTRACTOR_TYPE` | `llm` | `llm` |
-| `recipe_ingestion` | `RECIPE_INGESTION_TYPE` | `postgres` | `recipe_repository`, `ingredient_repository`, `embedding_repository` |
-| `dietitian` | `DIETITIAN_TYPE` | `file` | None |
+| `recipe_generation` | `RECIPE_GENERATION_TYPE` | `llm` | `llm`, `tenant` |
+| `recipe_extractor` | `RECIPE_EXTRACTOR_TYPE` | `llm` | `llm`, `tenant` |
+| `recipe_ingestion` | `RECIPE_INGESTION_TYPE` | `postgres` | `recipe_repository`, `ingredient_repository`, `embedding_repository`, `tenant` |
+| `dietitian` | `DIETITIAN_TYPE` | `file` | `tenant` |
 | `recipe_presentation` | `RECIPE_PRESENTATION_TYPE` | `structured` | None |
 
 For example, inspect or run the API from an activated Python environment:
@@ -223,6 +232,7 @@ graph = factories.chat_graph.create(
     nodes=nodes,
     checkpointer=checkpointer,
     model_registry=models,
+    tenant=tenant,
 )
 ```
 
@@ -233,10 +243,11 @@ the selected graph once per worker and invokes `arun(ChatGraphRequest(...))` for
 each `/chat` request. The HTTP request/response format remains unchanged.
 
 To add an experiment, implement `BaseChatGraph` in a new graph module. Its
-constructor receives `nodes`, `checkpointer`, and `model_registry`; its async
+constructor receives `nodes`, `checkpointer`, `model_registry`, and `tenant`; its async
 `arun(request)` handles `ChatGraphRequest` and returns chat state with
 `final_response` and `response_blocks`. Use the provided checkpointer and isolate
-conversation history by `request.user_id`. You can also subclass
+conversation history by `request.thread_id` (dietitian ID plus user ID). Reject
+requests whose `dietitian_id` differs from the supplied `tenant`. You can also subclass
 `RecipeChatGraph` and override `build_graph()` to reuse its request-state handling
 while changing the workflow connections.
 
@@ -470,7 +481,7 @@ node through a method, then call `build()` to obtain a `RecipeChatNodes` contain
 `backend.bootstrap.create_app()` uses the existing services and model clients:
 
 ```python
-builder = RecipeChatBuilder()
+builder = RecipeChatBuilder(tenant=tenant)
 builder.analysisNode(message_analyzer)
 builder.recipeNode(recipe_generation_service, recipe_search_service)
 builder.chatNode(models.for_role("chat"))
@@ -484,6 +495,7 @@ graph = factories.chat_graph.create(
     nodes=nodes,
     checkpointer=checkpointer,
     model_registry=models,
+    tenant=tenant,
 )
 ```
 
@@ -491,7 +503,7 @@ Each configuration method returns the builder, so calls can also be chained:
 
 ```python
 nodes = (
-    RecipeChatBuilder()
+    RecipeChatBuilder(tenant=tenant)
     .analysisNode(message_analyzer)
     .recipeNode(recipe_generation_service, recipe_search_service)
     .chatNode(models.for_role("chat"))
@@ -548,13 +560,13 @@ from backend.services.chat.experimental_message_analyzer import ExperimentalMess
 self.message_analyzer.register("experimental", ExperimentalMessageAnalyzer)
 ```
 
-The factory passes `llm=...` to this constructor. If your constructor needs
+The factory passes `llm=...` and `tenant=...` to this constructor. If your constructor needs
 different arguments, register an adapter that accepts the supplied dependencies:
 
 ```python
 self.message_analyzer.register(
     "experimental",
-    lambda llm: ExperimentalMessageAnalyzer(model=llm, prompt_version="v2"),
+    lambda llm, tenant: ExperimentalMessageAnalyzer(model=llm, tenant=tenant, prompt_version="v2"),
 )
 ```
 

@@ -3,7 +3,7 @@ import ChatMessage from './ChatMessage'
 import RecipeContent from './RecipeContent'
 import Icon from './Icon'
 
-export default function MessageList({ messages, isTyping, children }) {
+export default function MessageList({ messages, isTyping, children, assistantName }) {
   const listRef = useRef(null)
 
   useLayoutEffect(() => {
@@ -23,12 +23,12 @@ export default function MessageList({ messages, isTyping, children }) {
     <div className={`message-list ${messages.length ? '' : 'message-list-empty'}`} ref={listRef} role="log" aria-label="הודעות השיחה" aria-live="polite" aria-relevant="additions" tabIndex={0}>
       {messages.length === 0 ? children : <p className="conversation-start">משהו טוב מתבשל כאן</p>}
       {messages.map((msg) => (
-        <ChatMessage key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} blocks={msg.blocks} /> : msg.content} />
+        <ChatMessage assistantName={assistantName} key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} blocks={msg.blocks} /> : msg.content} />
       ))}
       {isTyping && (
         <div className="typing" role="status">
           <span className="message-avatar"><Icon name="leaf" /></span>
-          <span>אלונה חושבת</span>
+          <span>{assistantName} חושבת</span>
           <span className="typing-dots" aria-hidden="true"><span /><span /><span /></span>
         </div>
       )}

@@ -24,7 +24,8 @@ from backend.config.services import SERVICE_ENV_VARS, ServiceConfigurationError,
 class ExperimentalChatGraph(BaseChatGraph):
     """An independent test workflow, not a subclass of RecipeChatGraph."""
 
-    def __init__(self, *, nodes, checkpointer=None, model_registry=None):
+    def __init__(self, *, nodes, checkpointer=None, model_registry=None, tenant=None):
+        self.tenant = tenant
         self.nodes = nodes
         self.model_registry = model_registry
         self.checkpointer = checkpointer if checkpointer is not None else InMemorySaver()
@@ -53,7 +54,7 @@ class ExperimentalChatGraph(BaseChatGraph):
             "final_response": None,
             "response_blocks": None,
             "messages": [HumanMessage(content=request.message)],
-        }, config={"configurable": {"thread_id": request.user_id}})
+        }, config={"configurable": {"thread_id": request.thread_id}})
 
 
 @pytest.fixture
@@ -61,7 +62,6 @@ def experiment(monkeypatch):
     for name in ("SERVICES_CONFIG", "MODELS_CONFIG", *SERVICE_ENV_VARS.values(), *MODEL_ENV_VARS.values()):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(api, "_graph", None)
     factories = ServiceFactories()
     created = []
 
@@ -113,7 +113,7 @@ def test_api_runs_selected_chat_graph_once_with_existing_checkpointing(experimen
     monkeypatch.setattr(api, "enforce_rate_limits", lambda *_: None)
 
     with TestClient(api.app) as client_a:
-        graph = api.get_graph()
+        graph = api.app.state.graph
         assert isinstance(graph, BaseChatGraph)
         assert isinstance(graph, ExperimentalChatGraph)
         assert graph.checkpointer is memory
@@ -134,11 +134,11 @@ def test_api_runs_selected_chat_graph_once_with_existing_checkpointing(experimen
         a1, a2, b = graph.requests
         assert a1.user_id == a2.user_id
         assert a1.user_id != b.user_id
-        state_a = graph.workflow.get_state({"configurable": {"thread_id": a1.user_id}}).values
-        state_b = graph.workflow.get_state({"configurable": {"thread_id": b.user_id}}).values
+        state_a = graph.workflow.get_state({"configurable": {"thread_id": a1.thread_id}}).values
+        state_b = graph.workflow.get_state({"configurable": {"thread_id": b.thread_id}}).values
         assert [m.content for m in state_a["messages"] if isinstance(m, HumanMessage)] == ["Hi!", "Again"]
         assert [m.content for m in state_b["messages"] if isinstance(m, HumanMessage)] == ["Hello!"]
-        assert api.get_graph() is graph
+        assert api.app.state.graph is graph
     assert len(experiment.created) == 1
     experiment.dependencies.assert_called_once()
     saver_factory.assert_called_once_with(pool)

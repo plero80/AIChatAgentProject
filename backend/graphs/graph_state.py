@@ -10,6 +10,7 @@ from uuid import UUID
 from backend.models.recipe_create import RecipeCreate
 
 class GraphState(TypedDict):
+    dietitian_id: str
     user_id: str
 
     # Current message
@@ -38,6 +39,7 @@ class GraphState(TypedDict):
 
 
 class RecipeIngestionState(TypedDict, total=False):
+    dietitian_id: str
 
     # INPUT
     raw_recipe: str

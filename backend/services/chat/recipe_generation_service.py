@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 from langchain_core.language_models.chat_models import BaseChatModel
 from backend.models.recipe_plan import RecipePlan
 from backend.models.recipe import Recipe
@@ -8,8 +10,10 @@ class RecipeGenerationService(BaseRecipeGenerationService):
 
     def __init__(
         self,
-        llm: BaseChatModel
+        llm: BaseChatModel,
+        *, tenant: TenantContext | None = None,
     ):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.llm = llm
 
     async def generate_original_recipe(
@@ -18,20 +22,7 @@ class RecipeGenerationService(BaseRecipeGenerationService):
     ) -> str:
 
         response = await self.llm.ainvoke(
-            f"""
-            Invent a fully ORIGINAL recipe of your own.
-            This is NOT an Alona Eckrling recipe and must not come from any
-            saved recipe database. Do not reuse a known Alona recipe name
-            or Instagram URL. Clearly present it as your original idea.
-
-            Match the user's language (Hebrew if they wrote in Hebrew).
-
-            Ingredients to use / emphasize:
-            {plan.ingredients}
-
-            Preferences:
-            {plan.preferences}
-            """
+            self.tenant.render("generate_original", ingredients=plan.ingredients, preferences=plan.preferences)
         )
 
         return str(response.text)
@@ -43,20 +34,7 @@ class RecipeGenerationService(BaseRecipeGenerationService):
     ) -> str:
 
         response = await self.llm.ainvoke(
-            f"""
-            Create a new recipe inspired by the recipes below.
-
-            User ingredients:
-            {plan.ingredients}
-
-            User preferences:
-            {plan.preferences}
-
-            Reference recipes:
-            {similar_recipes}
-
-            Do not present the result as an existing Alona recipe.
-            """
+            self.tenant.render("generate_inspired", ingredients=plan.ingredients, preferences=plan.preferences, reference_recipes=similar_recipes)
         )
 
         return str(response.text)

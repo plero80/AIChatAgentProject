@@ -115,13 +115,13 @@ def test_graph_runs_built_nodes_and_keeps_user_histories_separate(dependencies, 
         assert isinstance(graph.memory, InMemorySaver)
 
     async def conversation():
-        a, b = await asyncio.gather(graph.arun(ChatGraphRequest("Hi!", "A")), graph.arun(ChatGraphRequest("Hello!", "B")))
+        a, b = await asyncio.gather(graph.arun(ChatGraphRequest("Hi!", "A", dietitian_id="clinic_001")), graph.arun(ChatGraphRequest("Hello!", "B", dietitian_id="clinic_001")))
         assert a["final_response"] == b["final_response"] == "Final reply"
         assert [message.content for message in a["messages"]] == ["Hi!", "Chat reply", "Final reply"]
         assert [message.content for message in b["messages"]] == ["Hello!", "Chat reply", "Final reply"]
 
     asyncio.run(conversation())
-    follow_up = graph.run(ChatGraphRequest("Again", "A"))
+    follow_up = graph.run(ChatGraphRequest("Again", "A", dietitian_id="clinic_001"))
     assert follow_up["response_blocks"] == [{"type": "text", "text": "Final reply"}]
     assert [message.content for message in follow_up["messages"]] == [
         "Hi!", "Chat reply", "Final reply", "Again", "Chat reply", "Final reply",

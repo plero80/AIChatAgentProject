@@ -6,7 +6,8 @@ from langchain_core.messages import HumanMessage
 
 from backend.models.message_analysis import MessageAnalysis
 from backend.models.request_validation import RequestValidation
-from backend.nodes.chat.guard_node import FALLBACK_REASON, GuardNode
+from backend.nodes.chat.guard_node import GuardNode
+from backend.tenancy import load_tenant
 
 
 class Validator:
@@ -84,7 +85,7 @@ def test_empty_reason_uses_the_fallback():
 
     result = asyncio.run(node(state()))
 
-    assert result["final_response"] == FALLBACK_REASON
+    assert result["final_response"] == load_tenant().render("refusal")
 
 
 def test_legitimate_request_keeps_the_branch_result():

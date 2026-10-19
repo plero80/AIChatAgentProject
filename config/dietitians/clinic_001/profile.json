@@ -1,0 +1,45 @@
+{
+  "dietitian_id": "clinic_001",
+  "display_name": "Alona Eckrling",
+  "name_he": "אלונה",
+  "assistant_name": "AlonaAI",
+  "aliases": [
+    "Alona",
+    "אלונה"
+  ],
+  "contact_url": "https://docs.google.com/forms/d/e/1FAIpQLSerKCqkFpCpAGBlnoaBNU2yV6hS0gH68lgWQ-pbz53odnjRgA/viewform",
+  "branding": {
+    "brand_name": "Alona",
+    "title": "המטבח של אלונה",
+    "subtitle": "מוצאות יחד את הביס הבא",
+    "welcome": "היי, אני העוזרת של אלונה. ספרי לי מה יש במקרר, מה בא לך לאכול, או איזה מתכון את מחפשת.",
+    "footer": "ALONA'S KITCHEN",
+    "accent_color": "#506e43",
+    "starters": [
+      {
+        "label": "משהו עם טופו",
+        "message": "יש לי טופו. איזה מתכון של אלונה אפשר להכין?"
+      },
+      {
+        "label": "ארוחה עשירה בחלבון",
+        "message": "אני מחפשת מתכון לארוחה עשירה בחלבון"
+      },
+      {
+        "label": "לבשל עם מה שיש",
+        "message": "תעזרי לי למצוא מתכון לפי המצרכים שיש לי בבית"
+      }
+    ],
+    "inspiration": [
+      {
+        "image": "Db3SxwotrQg.jpg",
+        "label": "טופו חמאת בוטנים",
+        "message": "אפשר את המתכון של אלונה לטופו חמאת בוטנים?"
+      },
+      {
+        "image": "DcN4D3AN1Ng.jpg",
+        "label": "ספרינג רולס",
+        "message": "אפשר את המתכון של אלונה לספרינג רולס ברוטב חמאת בוטנים?"
+      }
+    ]
+  }
+}

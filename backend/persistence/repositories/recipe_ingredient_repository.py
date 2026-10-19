@@ -1,3 +1,5 @@
+from backend.tenancy import validate_dietitian_id
+
 from backend.models.recipe import Ingredient
 from backend.persistence.database import Database
 from uuid import UUID
@@ -7,8 +9,9 @@ from uuid import uuid4
 
 class RecipeIngredientRepository:
 
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, dietitian_id: str):
         self.db = db
+        self.dietitian_id = validate_dietitian_id(dietitian_id)
 
     def find_recipe_with_ingredients(
         self,
@@ -30,11 +33,11 @@ class RecipeIngredientRepository:
                 COUNT(DISTINCT term) AS match_count
             FROM recipe_ingredients AS ri
             CROSS JOIN UNNEST(%s::text[]) AS term
-            WHERE LOWER(ri.ingredient_name) LIKE ('%%' || term || '%%')
+            WHERE ri.dietitian_id = %s AND LOWER(ri.ingredient_name) LIKE ('%%' || term || '%%')
             GROUP BY ri.recipe_id
             ORDER BY match_count DESC
             """,
-            (terms,),
+            (terms, self.dietitian_id),
         )
 
         return [row["recipe_id"] for row in rows]
@@ -53,10 +56,10 @@ class RecipeIngredientRepository:
                 quantity,
                 unit
             FROM recipe_ingredients
-            WHERE recipe_id = %s
+            WHERE dietitian_id = %s AND recipe_id = %s
             ORDER BY id
             """,
-            (recipe_id,),
+            (self.dietitian_id, recipe_id),
         )
 
         return [Ingredient(**row) for row in rows]
@@ -75,15 +78,17 @@ class RecipeIngredientRepository:
             conn.execute(
                 """
                 INSERT INTO recipe_ingredients (
+                    dietitian_id,
                     id,
                     recipe_id,
                     ingredient_name,
                     quantity,
                     unit
                 )
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
+                    self.dietitian_id,
                     ingredient_id,
                     recipe_id,
                     ingredient.ingredient_name,
@@ -91,4 +96,4 @@ class RecipeIngredientRepository:
                     ingredient.unit,
                 ),
             )
-
+

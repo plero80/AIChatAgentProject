@@ -1,27 +1,32 @@
+import json
+
+from backend.tenancy import validate_dietitian_id
+
 from backend.persistence.database import Database
 from backend.models.recipe import RecipeEmbedding
 from uuid import UUID
 
 
 class RecipeEmbeddingRepository:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, dietitian_id: str):
         self.db = db
+        self.dietitian_id = validate_dietitian_id(dietitian_id)
 
     def get_embeddings(self, recipe_id: UUID) -> list[RecipeEmbedding]:
         rows = self.db.fetch_all(
             """
             SELECT
                 recipe_id,
-                embedding,
+                embedding::text AS embedding,
                 model,
                 created_at
             FROM recipe_embeddings
-            WHERE recipe_id = %s
+            WHERE dietitian_id = %s AND recipe_id = %s
             ORDER BY created_at
             """,
-            (recipe_id,),
+            (self.dietitian_id, recipe_id),
         )
-        return [RecipeEmbedding(**row) for row in rows]
+        return [RecipeEmbedding(**{**row, "embedding": json.loads(row["embedding"])}) for row in rows]
 
     def find_most_similar_recipes(
         self,
@@ -38,12 +43,13 @@ class RecipeEmbeddingRepository:
                     recipe_id,
                     embedding <=> %s::vector AS distance
                 FROM recipe_embeddings
-                WHERE recipe_id = ANY(%s)
+                WHERE dietitian_id = %s AND recipe_id = ANY(%s)
                 ORDER BY distance
                 LIMIT %s
                 """,
                 (
                     embedding_str,
+                    self.dietitian_id,
                     candidate_ids,
                     top_k,
                 ),
@@ -55,11 +61,13 @@ class RecipeEmbeddingRepository:
                     recipe_id,
                     embedding <=> %s::vector AS distance
                 FROM recipe_embeddings
+                WHERE dietitian_id = %s
                 ORDER BY distance
                 LIMIT %s
                 """,
                 (
                     embedding_str,
+                    self.dietitian_id,
                     top_k,
                 ),
             )
@@ -79,13 +87,15 @@ class RecipeEmbeddingRepository:
         conn.execute(
             """
             INSERT INTO recipe_embeddings (
+                dietitian_id,
                 recipe_id,
                 embedding,
                 model
             )
-            VALUES (%s, %s::vector, %s)
+            VALUES (%s, %s, %s::vector, %s)
             """,
             (
+                self.dietitian_id,
                 recipe_id,
                 embedding_string,
                 model,

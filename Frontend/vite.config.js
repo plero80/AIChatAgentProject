@@ -10,6 +10,7 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      '/public-config': 'http://127.0.0.1:8000',
       '/health': 'http://127.0.0.1:8000',
       '/recipe-images': 'http://127.0.0.1:8000',
     },

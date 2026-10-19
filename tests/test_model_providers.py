@@ -122,7 +122,7 @@ def test_chat_provider_switch_keeps_openai_embeddings_for_chat_and_ingestion(mon
 
     chat = main.create_app(service_config=config, service_factories=factories, model_config=model_config)
     assert chat.nodes.analysis.analyzer.llm is llm
-    result = asyncio.run(chat.arun(ChatGraphRequest("hello", "provider-test")))
+    result = asyncio.run(chat.arun(ChatGraphRequest("hello", "provider-test", dietitian_id="clinic_001")))
     assert result["final_response"] == "Alternative provider reply"
     assert result["result"]["text"] == "Alternative provider reply"
     assert "Internal metadata" not in str(result)
@@ -130,10 +130,10 @@ def test_chat_provider_switch_keeps_openai_embeddings_for_chat_and_ingestion(mon
     ingestion = main.create_ingest_recipe(service_config=config, service_factories=factories, model_config=model_config)
     assert ingestion.embedding_node.embedding_model is embeddings
     assert ingestion.persist_node.embedding_model_name == "text-embedding-3-small"
-    assert ingestion.run(RecipeIngestionRequest("Some recipe text"))["success"] is True
+    assert ingestion.run(RecipeIngestionRequest("Some recipe text", dietitian_id="clinic_001"))["success"] is True
     embeddings.embed_query.assert_called_once()
     transaction = db.transaction.return_value.__enter__.return_value
-    assert transaction.execute.call_args.args[1][2] == "text-embedding-3-small"
+    assert transaction.execute.call_args.args[1][3] == "text-embedding-3-small"
     assert openai_embeddings.call_args_list == [
         call(model="text-embedding-3-small"),
         call(model="text-embedding-3-small"),

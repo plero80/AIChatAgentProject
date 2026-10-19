@@ -1,5 +1,7 @@
 """Build a container of chat nodes, one configuration step at a time."""
 
+from backend.tenancy import TenantContext, load_tenant
+
 from typing import Self
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -22,7 +24,8 @@ from backend.services.contracts import (
 
 
 class RecipeChatBuilder:
-    def __init__(self):
+    def __init__(self, *, tenant: TenantContext | None = None):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self._analysis: AnalyzeNode | None = None
         self._recipe: RecipeNode | None = None
         self._chat: ChatNode | None = None
@@ -42,21 +45,22 @@ class RecipeChatBuilder:
         self._recipe = RecipeNode(
             recipe_generation_service=recipe_generation_service,
             recipe_search_service=recipe_search_service,
+            tenant=self.tenant,
         )
         return self
 
     def chatNode(self, llm: BaseChatModel) -> Self:
-        self._chat = ChatNode(llm=llm)
+        self._chat = ChatNode(llm=llm, tenant=self.tenant)
         return self
 
     def responseNode(
         self, llm: BaseChatModel, presentation_service: BaseRecipePresentationService,
     ) -> Self:
-        self._response = ResponseNode(llm=llm, presentation_service=presentation_service)
+        self._response = ResponseNode(llm=llm, presentation_service=presentation_service, tenant=self.tenant)
         return self
 
     def dietitianNode(self, dietitian_service: BaseDietitianService) -> Self:
-        self._dietitian = DietitianNode(dietitian_service=dietitian_service)
+        self._dietitian = DietitianNode(dietitian_service=dietitian_service, tenant=self.tenant)
         return self
 
     def guardNode(self, validator: BaseRequestValidator) -> Self:
@@ -90,6 +94,7 @@ class RecipeChatBuilder:
             chat_node=self._chat,
             recipe_node=self._recipe,
             dietitian_node=self._dietitian,
+            tenant=self.tenant,
         )
         return RecipeChatNodes(
             analysis=self._analysis,

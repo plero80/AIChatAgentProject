@@ -12,6 +12,7 @@ class BaseChatGraph(BaseGraph[ChatGraphRequest, GraphState]):
     async def arun(self, request: ChatGraphRequest) -> GraphState:
         """Handle a chat turn and return final_response and response_blocks.
 
-        Preserve user_id isolation when storing conversation history. Workflow
-        topology and node selection belong to the concrete implementation.
+        Reject requests for a different deployment dietitian. Use request.thread_id
+        (dietitian_id + user_id) for conversation checkpoints, including in new
+        graph implementations. Workflow topology belongs to the implementation.
         """

@@ -1,3 +1,5 @@
+from backend.tenancy import validate_dietitian_id
+
 from backend.models.recipe import Recipe
 from backend.persistence.database import Database
 from uuid import UUID
@@ -6,11 +8,11 @@ from uuid import UUID
 from backend.models.recipe_create import RecipeCreate
 
 
-
 class RecipeRepository:
 
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, dietitian_id: str):
         self.db = db
+        self.dietitian_id = validate_dietitian_id(dietitian_id)
 
     def get_by_id(
         self,
@@ -28,9 +30,9 @@ class RecipeRepository:
                 image_url,
                 created_at
             FROM recipes
-            WHERE id = %s
+            WHERE dietitian_id = %s AND id = %s
             """,
-            (recipe_id,),
+            (self.dietitian_id, recipe_id),
         )
 
         if row is None:
@@ -53,9 +55,9 @@ class RecipeRepository:
                 image_url,
                 created_at
             FROM recipes
-            WHERE id = ANY(%s)
+            WHERE dietitian_id = %s AND id = ANY(%s)
             """,
-            (recipes_ids,),
+            (self.dietitian_id, recipes_ids),
         )
 
         by_id = {row["id"]: Recipe(**row) for row in rows}
@@ -70,15 +72,15 @@ class RecipeRepository:
         """Identify an already-ingested recipe by its Instagram post or exact name."""
         if instagram_url:
             row = self.db.fetch_one(
-                "SELECT id FROM recipes WHERE instagram_url = %s",
-                (instagram_url,),
+                "SELECT id FROM recipes WHERE dietitian_id = %s AND instagram_url = %s",
+                (self.dietitian_id, instagram_url),
             )
             if row is not None:
                 return row["id"]
 
         row = self.db.fetch_one(
-            "SELECT id FROM recipes WHERE name = %s",
-            (name,),
+            "SELECT id FROM recipes WHERE dietitian_id = %s AND name = %s",
+            (self.dietitian_id, name),
         )
 
         return row["id"] if row is not None else None
@@ -95,9 +97,9 @@ class RecipeRepository:
                 image_url,
                 created_at
             FROM recipes
-            WHERE name ILIKE %s
+            WHERE dietitian_id = %s AND name ILIKE %s
             """,
-            (f"%{name}%",),
+            (self.dietitian_id, f"%{name}%"),
         )
 
         return [Recipe(**row) for row in rows]
@@ -114,6 +116,7 @@ class RecipeRepository:
         conn.execute(
             """
             INSERT INTO recipes (
+                dietitian_id,
                 id,
                 name,
                 description,
@@ -121,9 +124,10 @@ class RecipeRepository:
                 instagram_url,
                 image_url
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             (
+                self.dietitian_id,
                 recipe_id,
                 recipe.name,
                 recipe.description,

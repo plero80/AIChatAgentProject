@@ -52,12 +52,12 @@ def test_every_factory_requires_a_complete_abstract_contract():
 
 def test_registration_is_isolated_and_does_not_replace_an_existing_type():
     first, second = ServiceFactories(), ServiceFactories()
-    first.message_analyzer.register("experimental", lambda llm: ExperimentalAnalyzer())
+    first.message_analyzer.register("experimental", lambda llm, **deps: ExperimentalAnalyzer())
     with pytest.raises(ValueError, match="already registered"):
         first.message_analyzer.register("llm", ExperimentalAnalyzer)
     with pytest.raises(ServiceConfigurationError):
         second.message_analyzer.create("experimental", llm=object())
-    first.message_analyzer.register("broken", lambda llm: object())
+    first.message_analyzer.register("broken", lambda llm, **deps: object())
     with pytest.raises(TypeError, match="must return BaseMessageAnalyzer"):
         first.message_analyzer.create("broken", llm=object())
 
@@ -74,7 +74,7 @@ def test_bad_config_fails_before_models_or_database_are_created(monkeypatch, bui
 def test_default_factories_build_chat_and_ingestion_without_network(monkeypatch):
     llm = MagicMock()
     models = SimpleNamespace(for_role=lambda role: llm)
-    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config: (models, object(), object(), object(), object()))
+    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config, tenant: (models, object(), object(), object(), object()))
     config = ServiceConfig()
     chat = main.create_app(service_config=config)
     ingestion = main.create_ingest_recipe(service_config=config)
@@ -121,14 +121,14 @@ def test_alternative_services_run_through_the_existing_chat_graph(monkeypatch, t
             return AIMessage(content="Rendered answer")
 
     factories = ServiceFactories()
-    factories.message_analyzer.register("experimental", lambda llm: analyzer)
-    factories.request_validator.register("experimental", lambda llm: Validator())
+    factories.message_analyzer.register("experimental", lambda llm, **deps: analyzer)
+    factories.request_validator.register("experimental", lambda llm, **deps: Validator())
     factories.recipe_search.register("experimental", lambda **deps: Search())
-    factories.recipe_generation.register("experimental", lambda llm: Generation())
-    factories.dietitian.register("experimental", Dietitian)
+    factories.recipe_generation.register("experimental", lambda llm, **deps: Generation())
+    factories.dietitian.register("experimental", lambda **deps: Dietitian())
     factories.recipe_presentation.register("experimental", Presentation)
     models = SimpleNamespace(for_role=lambda role: LLM())
-    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config: (models, object(), object(), object(), object()))
+    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config, tenant: (models, object(), object(), object(), object()))
     path = tmp_path / "experiment.json"
     path.write_text(json.dumps({
         name: "experimental" for name in (
@@ -142,10 +142,10 @@ def test_alternative_services_run_through_the_existing_chat_graph(monkeypatch, t
 
     async def conversation():
         for message, mode in [("invent", "original"), ("find", "not_found"), ("support", "dietitian_escort")]:
-            result = await graph.arun(ChatGraphRequest(message, "factory-test"))
+            result = await graph.arun(ChatGraphRequest(message, "factory-test", dietitian_id="clinic_001"))
             assert result["result"]["mode"] == mode
             assert result["final_response"] == "Custom presentation: Rendered answer"
-        assert "Experimental recipe" in str((await graph.arun(ChatGraphRequest("invent", "another-user")))["result"])
+        assert "Experimental recipe" in str((await graph.arun(ChatGraphRequest("invent", "another-user", dietitian_id="clinic_001")))["result"])
 
     asyncio.run(conversation())
     assert {"validate", "search", "generate", "dietitian", "present"} <= set(calls)
@@ -171,16 +171,16 @@ def test_alternative_ingestion_services_run_through_the_existing_graph(monkeypat
             return [0.1, 0.2]
 
     factories = ServiceFactories()
-    factories.recipe_extractor.register("experimental", lambda llm: Extractor())
+    factories.recipe_extractor.register("experimental", lambda llm, **deps: Extractor())
     factories.recipe_ingestion.register("experimental", lambda **deps: Ingestion())
     models = SimpleNamespace(for_role=lambda role: object())
-    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config: (models, Embeddings(), object(), object(), object()))
+    monkeypatch.setattr(main, "get_required_services", lambda config, factories, model_config, tenant: (models, Embeddings(), object(), object(), object()))
     monkeypatch.setattr(main.settings, "EMBEDDING_MODEL", "test-embedding-model")
     graph = main.create_ingest_recipe(
         service_config=ServiceConfig(recipe_extractor="experimental", recipe_ingestion="experimental"),
         service_factories=factories,
     )
-    result = graph.run(RecipeIngestionRequest("Recipe from a different extractor"))
+    result = graph.run(RecipeIngestionRequest("Recipe from a different extractor", dietitian_id="clinic_001"))
     assert result["success"] is True
     assert result["recipe_id"] == recipe_id
     assert saved[0][0].name == "Recipe from a different extractor"

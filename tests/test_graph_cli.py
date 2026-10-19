@@ -48,7 +48,7 @@ def test_chat_constructs_one_graph_and_keeps_one_session_and_event_loop(monkeypa
 
     assert main.main(["chat", "--user-id", "session-a"]) == 0
     factory.assert_called_once_with()
-    assert graph.requests == [ChatGraphRequest("Hi!", "session-a"), ChatGraphRequest("Hello!", "session-a")]
+    assert graph.requests == [ChatGraphRequest("Hi!", "session-a", dietitian_id="clinic_001"), ChatGraphRequest("Hello!", "session-a", dietitian_id="clinic_001")]
     assert graph.loops[0] is graph.loops[1]
     assert capsys.readouterr().out.count("Alona: Reply") == 2
 
@@ -85,7 +85,7 @@ def test_ingest_reads_utf8_file_and_uses_its_own_request_type(tmp_path, monkeypa
 
     assert main.main(["ingest", "--file", str(path)]) == 0
     factory.assert_called_once_with()
-    assert graph.requests == [RecipeIngestionRequest("מתכון\nIngredients and instructions")]
+    assert graph.requests == [RecipeIngestionRequest("מתכון\nIngredients and instructions", dietitian_id="clinic_001")]
     assert "Recipe saved: recipe-123" in capsys.readouterr().out
 
 
@@ -191,3 +191,20 @@ def test_another_graph_and_command_can_be_registered_without_changing_dispatch(c
 
     assert run_cli(["uppercase", "--text", "hello"], commands={"uppercase": UppercaseCommand()}) == 0
     assert capsys.readouterr().out.strip() == "HELLO"
+
+
+def test_cli_chat_and_ingestion_use_the_selected_deployment(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("DIETITIAN_ID", "clinic_002")
+    chat = RecordingGraph({"final_response": "Reply"})
+    monkeypatch.setattr(main, "create_app", lambda: chat)
+    messages = iter(["Hi", "quit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(messages))
+    assert main.main(["chat"]) == 0
+    assert chat.requests[0].dietitian_id == "clinic_002"
+    assert "Dana: Reply" in capsys.readouterr().out
+    path = tmp_path / "recipe.txt"
+    path.write_text("Dana recipe", encoding="utf-8")
+    ingestion = RecordingGraph({"success": True, "recipe_id": "test"})
+    monkeypatch.setattr(main, "create_ingest_recipe", lambda: ingestion)
+    assert main.main(["ingest", "--file", str(path)]) == 0
+    assert ingestion.requests[0].dietitian_id == "clinic_002"

@@ -1,12 +1,11 @@
+from backend.tenancy import TenantContext, load_tenant
+
 import re
 from uuid import UUID, uuid4
 
-from backend.paths import DATA_DIR
 from backend.models.recipe_create import RecipeCreate
 from backend.services.contracts import BaseRecipeIngestionService
 from backend.services.exceptions import RecipeAlreadyExists
-
-_IMAGES = DATA_DIR / "recipe_images"
 
 
 class RecipeIngestionService(BaseRecipeIngestionService):
@@ -16,7 +15,9 @@ class RecipeIngestionService(BaseRecipeIngestionService):
         recipe_repository,
         ingredient_repository,
         embedding_repository,
+        *, tenant: TenantContext | None = None,
     ):
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.recipe_repository = recipe_repository
         self.ingredient_repository = ingredient_repository
         self.embedding_repository = embedding_repository
@@ -36,7 +37,7 @@ class RecipeIngestionService(BaseRecipeIngestionService):
         if existing_id is not None:
             raise RecipeAlreadyExists(existing_id, recipe.name)
 
-        _attach_saved_image(recipe)
+        _attach_saved_image(recipe, self.tenant)
 
         # Create ONE ID for this recipe
         recipe_id = uuid4()
@@ -62,15 +63,15 @@ class RecipeIngestionService(BaseRecipeIngestionService):
         return recipe_id
 
 
-def _attach_saved_image(recipe: RecipeCreate) -> None:
+def _attach_saved_image(recipe: RecipeCreate, tenant: TenantContext) -> None:
     """Use the photo already downloaded for this Instagram post."""
     if recipe.image_url or not recipe.instagram_url:
         return
 
-    match = re.search(r"/p/([^/?#]+)", recipe.instagram_url)
+    match = re.search(r"/p/([A-Za-z0-9_-]+)(?:[/?#]|$)", recipe.instagram_url)
     if match is None:
         return
 
     code = match.group(1)
-    if (_IMAGES / f"{code}.jpg").is_file():
+    if (tenant.images_dir / f"{code}.jpg").is_file():
         recipe.image_url = f"/recipe-images/{code}.jpg"

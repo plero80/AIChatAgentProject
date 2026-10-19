@@ -1,3 +1,5 @@
+from backend.tenancy import TenantContext, load_tenant
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,8 +25,10 @@ class RecipeChatGraph(BaseChatGraph):
         *,
         checkpointer: BaseCheckpointSaver | None = None,
         model_registry: "ModelRegistry | None" = None,
+        tenant: TenantContext | None = None,
     ):
         # Retain the startup registry for inspecting/reusing the initialized clients.
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.model_registry = model_registry
         # Falls back to in-process memory when no durable store is provided
         self.memory = checkpointer if checkpointer is not None else InMemorySaver()
@@ -55,9 +59,12 @@ class RecipeChatGraph(BaseChatGraph):
         return "response"
 
     async def arun(self, request: ChatGraphRequest) -> GraphState:
+        if request.dietitian_id != self.tenant.dietitian_id:
+            raise ValueError("Request dietitian does not match this graph deployment")
 
         initial_state = {
             "user_id": request.user_id,
+            "dietitian_id": request.dietitian_id,
             "message": request.message,
             # Checkpoints preserve state across turns. Presentation and routing
             # data belong only to this request; never reuse a previous photo.
@@ -73,7 +80,7 @@ class RecipeChatGraph(BaseChatGraph):
 
         config = {
             "configurable": {
-                "thread_id": request.user_id
+                "thread_id": request.thread_id
             }
         }
 

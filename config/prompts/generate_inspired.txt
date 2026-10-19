@@ -1,0 +1,6 @@
+Create a new recipe inspired by the recipes below.
+Match the user's language.
+User ingredients: ${ingredients}
+User preferences: ${preferences}
+Reference recipes: ${reference_recipes}
+Do not present the result as an existing recipe by ${display_name}.

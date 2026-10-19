@@ -151,11 +151,11 @@ def test_each_role_uses_its_profile_and_requests_reuse_the_clients(monkeypatch):
     assert graph.nodes.response.llm is clients["response"]
 
     async def run_requests():
-        a, b = await asyncio.gather(graph.arun(ChatGraphRequest("Hi!", "A")), graph.arun(ChatGraphRequest("Hello!", "B")))
+        a, b = await asyncio.gather(graph.arun(ChatGraphRequest("Hi!", "A", dietitian_id="clinic_001")), graph.arun(ChatGraphRequest("Hello!", "B", dietitian_id="clinic_001")))
         for result in (a, b):
             assert result["result"]["text"] == "Reply from chat"
             assert result["final_response"] == "Reply from response"
-        result = await graph.arun(ChatGraphRequest("invent an original recipe", "C"))
+        result = await graph.arun(ChatGraphRequest("invent an original recipe", "C", dietitian_id="clinic_001"))
         assert result["result"]["text"] == "Reply from recipe_generation"
         assert result["final_response"] == "Reply from response"
 
@@ -168,7 +168,7 @@ def test_each_role_uses_its_profile_and_requests_reuse_the_clients(monkeypatch):
     assert clients["response"].calls == ["text"] * 3
 
     ingestion = main.create_ingest_recipe(service_config=ServiceConfig(), service_factories=factories, model_config=config)
-    assert ingestion.run(RecipeIngestionRequest("Some recipe text"))["success"] is True
+    assert ingestion.run(RecipeIngestionRequest("Some recipe text", dietitian_id="clinic_001"))["success"] is True
     assert ingestion.model_registry.models["recipe_extractor"].calls == ["RecipeCreate"]
     assert ingestion.embedding_node.embedding_model is embeddings
     assert ingestion.persist_node.embedding_model_name == "text-embedding-3-small"

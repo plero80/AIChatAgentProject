@@ -4,6 +4,7 @@ import os
 from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
+from psycopg.conninfo import make_conninfo
 
 from backend.paths import PROJECT_ROOT
 
@@ -98,9 +99,9 @@ class Settings:
 
     @classmethod
     def db_conninfo(cls) -> str:
-        return (
-            f"host={cls.DB_HOST} port={cls.DB_PORT} dbname={cls.DB_NAME} "
-            f"user={cls.DB_USER} password={cls.DB_PASSWORD}"
+        return make_conninfo(
+            host=cls.DB_HOST, port=cls.DB_PORT, dbname=cls.DB_NAME,
+            user=cls.DB_USER, password=cls.DB_PASSWORD,
         )
 
 

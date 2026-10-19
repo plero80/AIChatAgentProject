@@ -1,14 +1,13 @@
-import re
+from backend.tenancy import TenantContext, load_tenant
 
+import re
 
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
 
-
 from backend.models.recipe_create import RecipeCreate
 from backend.services.contracts import BaseRecipeExtractorService
-
 
 
 _URL_LINE = re.compile(
@@ -18,11 +17,7 @@ _URL_LINE = re.compile(
 )
 
 
-
-
-
 class RecipeExtractorService(BaseRecipeExtractorService):
-
 
 
     def __init__(
@@ -30,9 +25,11 @@ class RecipeExtractorService(BaseRecipeExtractorService):
         self,
 
         llm: BaseChatModel,
+        *, tenant: TenantContext | None = None,
 
     ):
 
+        self.tenant = tenant if tenant is not None else load_tenant()
         self.llm = llm.with_structured_output(
 
             RecipeCreate,
@@ -40,7 +37,6 @@ class RecipeExtractorService(BaseRecipeExtractorService):
             method="function_calling",
 
         )
-
 
 
     def extract(
@@ -54,7 +50,6 @@ class RecipeExtractorService(BaseRecipeExtractorService):
     ) -> RecipeCreate:
 
 
-
         recipe = self.llm.invoke(
 
             [
@@ -63,41 +58,7 @@ class RecipeExtractorService(BaseRecipeExtractorService):
 
                     "system",
 
-                    """
-
-                Extract a recipe from the provided text.
-
-
-
-                Return:
-
-                - recipe name
-
-                - description
-
-                - instructions
-
-                - ingredients
-
-                - quantity for each ingredient when available
-
-                - unit for each ingredient when available
-
-                - instagram_url if the text contains an Instagram URL
-
-                  (e.g. a line like "instagram_url = https://..." or "url = ...")
-
-
-
-                Do not invent quantities or ingredients that are
-
-                not present in the source.
-
-
-
-                If quantity, unit, or instagram_url is unknown, return null.
-
-                """,
+                    self.tenant.render("extract_recipe"),
 
                 ),
 
@@ -114,7 +75,6 @@ class RecipeExtractorService(BaseRecipeExtractorService):
         )
 
 
-
         # Explicit arg wins; else keep LLM value; else parse from raw text
 
         if instagram_url:
@@ -126,9 +86,7 @@ class RecipeExtractorService(BaseRecipeExtractorService):
             recipe.instagram_url = self._parse_url_from_text(recipe_text)
 
 
-
         return recipe
-
 
 
     def _parse_url_from_text(self, recipe_text: str) -> str | None:

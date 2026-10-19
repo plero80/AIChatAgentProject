@@ -1,4 +1,5 @@
 from backend.models.recipe_create import RecipeCreate
+from backend.tenancy import load_tenant
 from backend.services.ingestion.recipe_ingestion_service import _attach_saved_image
 
 
@@ -10,6 +11,6 @@ def test_ingestion_attaches_a_bundled_image_after_project_reorganization():
         instagram_url="https://www.instagram.com/p/Db3SxwotrQg/",
     )
 
-    _attach_saved_image(recipe)
+    _attach_saved_image(recipe, load_tenant())
 
     assert recipe.image_url == "/recipe-images/Db3SxwotrQg.jpg"
