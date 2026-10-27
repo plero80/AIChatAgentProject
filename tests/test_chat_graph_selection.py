@@ -17,6 +17,9 @@ from backend.graphs.base_chat_graph import BaseChatGraph
 from backend.graphs.graph_requests import ChatGraphRequest
 from backend.graphs.graph_state import GraphState
 from backend.graphs.recipe_ingestion_graph import RecipeIngestionGraph
+from backend.graphs.compiled_recipe_chat_graph import CompiledRecipeChatGraph
+from backend.models.message_analysis import MessageAnalysis
+from backend.models.request_validation import RequestValidation
 from backend.config.models import MODEL_ENV_VARS
 from backend.config.services import SERVICE_ENV_VARS, ServiceConfigurationError, load_service_config
 
@@ -113,7 +116,12 @@ def test_api_runs_selected_chat_graph_once_with_existing_checkpointing(experimen
     monkeypatch.setattr(api, "enforce_rate_limits", lambda *_: None)
 
     with TestClient(api.app) as client_a:
-        graph = api.app.state.graph
+        async def selected_graph():
+            async with api.app.state.workflow_facade.cache.acquire(api.app.state.workflow.client) as workflow:
+                return workflow.workflow.graph
+
+        graph = client_a.portal.call(selected_graph)
+        bound_workflow = api.app.state.workflow
         assert isinstance(graph, BaseChatGraph)
         assert isinstance(graph, ExperimentalChatGraph)
         assert graph.checkpointer is memory
@@ -126,11 +134,9 @@ def test_api_runs_selected_chat_graph_once_with_existing_checkpointing(experimen
                 "blocks": [{"type": "text", "text": "Alternate answer [experimental]"}],
             }
         # A second HTTP session shares the graph but has a different history ID.
-        client_b = TestClient(api.app)
-        try:
-            assert client_b.post("/chat", json={"message": "Hello!"}).status_code == 200
-        finally:
-            client_b.close()
+        # Keep one server event loop; clearing cookies simulates another browser.
+        client_a.cookies.clear()
+        assert client_a.post("/chat", json={"message": "Hello!"}).status_code == 200
         a1, a2, b = graph.requests
         assert a1.user_id == a2.user_id
         assert a1.user_id != b.user_id
@@ -138,7 +144,9 @@ def test_api_runs_selected_chat_graph_once_with_existing_checkpointing(experimen
         state_b = graph.workflow.get_state({"configurable": {"thread_id": b.thread_id}}).values
         assert [m.content for m in state_a["messages"] if isinstance(m, HumanMessage)] == ["Hi!", "Again"]
         assert [m.content for m in state_b["messages"] if isinstance(m, HumanMessage)] == ["Hello!"]
-        assert api.app.state.graph is graph
+        assert api.app.state.workflow is bound_workflow
+        assert client_a.portal.call(selected_graph) is graph
+    assert api.app.state.workflow is None
     assert len(experiment.created) == 1
     experiment.dependencies.assert_called_once()
     saver_factory.assert_called_once_with(pool)
@@ -150,12 +158,12 @@ def test_unknown_chat_graph_fails_before_external_dependencies(experiment, monke
     monkeypatch.setenv("CHAT_GRAPH_TYPE", "missing")
     pool = MagicMock(side_effect=AssertionError("Checkpoint pool opened"))
     monkeypatch.setattr(api, "AsyncConnectionPool", pool)
-    with pytest.raises(ServiceConfigurationError, match="Unknown chat_graph.*Available: experimental, recipe"):
+    with pytest.raises(ServiceConfigurationError, match="Unknown chat_graph.*Available: experimental, json_recipe, recipe"):
         if entry == "api":
             with TestClient(api.app):
                 pytest.fail("Invalid graph selection started the API")
         else:
-            main.create_app()
+            main.create_chat_workflow()
     pool.assert_not_called()
     experiment.dependencies.assert_not_called()
     assert experiment.created == []
@@ -178,6 +186,48 @@ def test_inspection_lists_graph_choices_without_building_them(experiment, capsys
     ])
     choices = json.loads(capsys.readouterr().out)
     assert choices["selected"]["chat_graph"] == "experimental"
-    assert choices["available"]["chat_graph"] == ["experimental", "recipe"]
+    assert choices["available"]["chat_graph"] == ["experimental", "json_recipe", "recipe"]
     experiment.dependencies.assert_not_called()
     assert experiment.created == []
+
+
+def test_api_and_cli_run_the_json_recipe_choice(experiment, monkeypatch, capsys):
+    monkeypatch.setenv("CHAT_GRAPH_TYPE", "json_recipe")
+    model = experiment.models.for_role("chat")
+
+    def structured(schema):
+        value = (
+            MessageAnalysis(intent="chat", recipe_mode="none")
+            if schema is MessageAnalysis else RequestValidation(legitimate=True)
+        )
+        return SimpleNamespace(ainvoke=AsyncMock(return_value=value))
+
+    model.with_structured_output.side_effect = structured
+    memory = InMemorySaver()
+    memory.setup = AsyncMock()
+    pool = MagicMock()
+    pool.__aenter__ = AsyncMock(return_value=pool)
+    pool.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(api, "AsyncConnectionPool", MagicMock(return_value=pool))
+    monkeypatch.setattr(api, "AsyncPostgresSaver", MagicMock(return_value=memory))
+    monkeypatch.setattr(api, "enforce_rate_limits", lambda *_: None)
+    with TestClient(api.create_http_app()) as client:
+        workflow = client.app.state.workflow
+        async def selected_graph():
+            async with client.app.state.workflow_facade.cache.acquire(workflow.client) as runtime:
+                return runtime.workflow.graph
+
+        assert isinstance(client.portal.call(selected_graph), CompiledRecipeChatGraph)
+        for message in ("Hi", "Again"):
+            response = client.post("/chat", json={"message": message})
+            assert response.status_code == 200
+            assert response.json() == {
+                "reply": "Alternate answer",
+                "blocks": [{"type": "text", "text": "Alternate answer"}],
+            }
+        assert client.app.state.workflow is workflow
+
+    messages = iter(["Hello", "quit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(messages))
+    assert main.main(["chat"]) == 0
+    assert "Alternate answer" in capsys.readouterr().out

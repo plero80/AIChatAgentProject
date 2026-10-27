@@ -1,26 +1,30 @@
-from backend.tenancy import load_tenant
-
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from uuid import uuid4
 
 from backend.cli.commands.base_command import BaseCommand
-from backend.graphs.base_chat_graph import BaseChatGraph
-from backend.graphs.graph_requests import ChatGraphRequest
+from backend.workflows.contracts import ChatWorkflow, ConversationRequest
 
 
 class ChatCommand(BaseCommand):
     description = "Start an interactive chat (exit or quit to finish)."
 
-    def __init__(self, graph_factory: Callable[[], BaseChatGraph]):
-        self.graph_factory = graph_factory
+    def __init__(self, workflow_factory: Callable[[], ChatWorkflow | AbstractAsyncContextManager[ChatWorkflow]]):
+        self.workflow_factory = workflow_factory
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("--user-id", help="Conversation ID; defaults to a new ID for this session")
 
     async def run(self, args: Namespace) -> int:
-        tenant = load_tenant()
-        graph = self.graph_factory()
+        async with AsyncExitStack() as resources:
+            created = self.workflow_factory()
+            # Already-built workflows remain caller-owned (tests/embedded CLI).
+            workflow = created if isinstance(created, ChatWorkflow) else await resources.enter_async_context(created)
+            return await self._chat(args, workflow)
+
+    async def _chat(self, args: Namespace, workflow: ChatWorkflow) -> int:
+        client = workflow.client
         user_id = args.user_id or str(uuid4())
         while True:
             try:
@@ -31,5 +35,10 @@ class ChatCommand(BaseCommand):
                 return 0
             if not message:
                 continue
-            result = await graph.arun(ChatGraphRequest(message=message, user_id=user_id, dietitian_id=tenant.dietitian_id))
-            print(f"{tenant.profile.branding.brand_name}:", result["final_response"])
+            result = await workflow.respond(ConversationRequest(
+                message=message,
+                conversation_id=user_id,
+                client_id=client.client_id,
+                release_id=client.release_id,
+            ))
+            print(f"{client.display_name}:", result.reply)

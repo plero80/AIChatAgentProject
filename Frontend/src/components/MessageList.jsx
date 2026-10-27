@@ -3,6 +3,17 @@ import ChatMessage from './ChatMessage'
 import RecipeContent from './RecipeContent'
 import Icon from './Icon'
 
+function UserMessageContent({ message }) {
+  const images = message.images ?? (message.image ? [message.image] : [])
+  return <>
+    {images.length > 0 && <div className={`user-photos ${images.length === 1 ? 'single-photo' : ''}`}>
+      {images.map((src, index) => <img key={index} className="user-photo" src={src} alt={`תמונת מצרכים ${index + 1} ששלחת`} />)}
+    </div>}
+    {message.content && <span>{message.content}</span>}
+    {message.failed && <small className="failed-message">השליחה לא הושלמה. אפשר לנסות שוב.</small>}
+  </>
+}
+
 export default function MessageList({ messages, isTyping, children, assistantName }) {
   const listRef = useRef(null)
 
@@ -23,7 +34,7 @@ export default function MessageList({ messages, isTyping, children, assistantNam
     <div className={`message-list ${messages.length ? '' : 'message-list-empty'}`} ref={listRef} role="log" aria-label="הודעות השיחה" aria-live="polite" aria-relevant="additions" tabIndex={0}>
       {messages.length === 0 ? children : <p className="conversation-start">משהו טוב מתבשל כאן</p>}
       {messages.map((msg) => (
-        <ChatMessage assistantName={assistantName} key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} blocks={msg.blocks} /> : msg.content} />
+        <ChatMessage assistantName={assistantName} key={msg.id} role={msg.role} content={msg.role === 'assistant' ? <RecipeContent content={msg.content} blocks={msg.blocks} /> : <UserMessageContent message={msg} />} />
       ))}
       {isTyping && (
         <div className="typing" role="status">

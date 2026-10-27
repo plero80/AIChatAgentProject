@@ -12,6 +12,7 @@ from langgraph.graph import StateGraph, START, END
 from backend.graphs.graph_state import RecipeIngestionState
 from backend.graphs.base_graph import BaseGraph
 from backend.graphs.graph_requests import RecipeIngestionRequest
+from backend.workflows.build_trace import GraphBuildTrace, qualified_name
 
 from backend.nodes.ingestion.extract_recipe_node import ExtractRecipeNode
 from backend.nodes.ingestion.prepare_embedding_node import PrepareEmbeddingNode
@@ -40,57 +41,35 @@ class RecipeIngestionGraph(BaseGraph[RecipeIngestionRequest, RecipeIngestionStat
         self.graph = self.build_graph()
 
     def build_graph(self):
+        with GraphBuildTrace(workflow="recipe_ingestion", source="python", client_id=self.tenant.dietitian_id) as trace:
+            self.build_trace_path = trace.path
+            return self._build_ingestion_graph(trace)
+
+    def _build_ingestion_graph(self, trace):
+        trace.stage("state_schema")
+        trace.schema(RecipeIngestionState)
 
         builder = StateGraph(
             RecipeIngestionState
         )
-
-        builder.add_node(
-            "extract",
-            self.extract_node,
-        )
-
-        builder.add_node(
-            "prepare_embedding",
-            self.prepare_embedding_node,
-        )
-
-        builder.add_node(
-            "create_embedding",
-            self.embedding_node,
-        )
-
-        builder.add_node(
-            "persist",
-            self.persist_node,
-        )
-
-        builder.add_edge(
-            START,
-            "extract",
-        )
-
-        builder.add_edge(
-            "extract",
-            "prepare_embedding",
-        )
-
-        builder.add_edge(
-            "prepare_embedding",
-            "create_embedding",
-        )
-
-        builder.add_edge(
-            "create_embedding",
-            "persist",
-        )
-
-        builder.add_edge(
-            "persist",
-            END,
-        )
-
-        return builder.compile()
+        trace.stage("nodes")
+        for name, node in (
+            ("extract", self.extract_node), ("prepare_embedding", self.prepare_embedding_node),
+            ("create_embedding", self.embedding_node), ("persist", self.persist_node),
+        ):
+            builder.add_node(name, node)
+            trace.record("node_added", node_id=name, implementation=qualified_name(node))
+        trace.stage("connections")
+        for source, target in (
+            (START, "extract"), ("extract", "prepare_embedding"),
+            ("prepare_embedding", "create_embedding"), ("create_embedding", "persist"), ("persist", END),
+        ):
+            builder.add_edge(source, target)
+            trace.record("edge_added", from_node="START" if source == START else source, to_node="END" if target == END else target)
+        trace.stage("compile", checkpointer=None)
+        graph = builder.compile()
+        trace.record("graph_compiled", state_schema="RecipeIngestionState")
+        return graph
 
     async def arun(self, request: RecipeIngestionRequest) -> RecipeIngestionState:
         if request.dietitian_id != self.tenant.dietitian_id:

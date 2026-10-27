@@ -1,0 +1,63 @@
+:root[data-theme='michael'] { color-scheme: dark; background: #111214; }
+.shell[data-theme='michael'] {
+  --ink: #f0eeea;
+  --ink-soft: #b5b1aa;
+  --linen: #111214;
+  --panel: #1a1b1e;
+  --olive: #d5b080;
+  --olive-deep: #ba915d;
+  --line: #343437;
+  color: var(--ink);
+}
+.shell[data-theme='michael'] .brand-name { font-family: var(--font-body); font-weight: 700; font-size: 28px; letter-spacing: -.6px; }
+.shell[data-theme='michael'] .brand-name > span,
+.shell[data-theme='michael'] .sidebar-intro h1 > span,
+.shell[data-theme='michael'] .eyebrow,
+.shell[data-theme='michael'] .welcome-illustration > span { color: var(--olive); }
+.shell[data-theme='michael'] .brand-symbol { color: var(--olive); border-color: #66513a; }
+.shell[data-theme='michael'] .topbar-note > span,
+.shell[data-theme='michael'] .small-rule,
+.shell[data-theme='michael'] .typing-dots > span { background: var(--olive); }
+.shell[data-theme='michael'] .chat-panel { box-shadow: 0 16px 60px #0004; }
+.shell[data-theme='michael'] .chat-header-tag,
+.shell[data-theme='michael'] .assistant-avatar,
+.shell[data-theme='michael'] .message-avatar,
+.shell[data-theme='michael'] .welcome-illustration { background: #30291f; color: #e0bb8b; }
+.shell[data-theme='michael'] .message-list { background: #17181b; scrollbar-color: #55514a transparent; }
+.shell[data-theme='michael'] .message-list-empty { background: radial-gradient(ellipse at 50% 45%, #27231e 0, #17181b 72%); }
+.shell[data-theme='michael'] .starter-prompts button { background: #252527; border-color: #49433a; }
+.shell[data-theme='michael'] .starter-prompts button:hover { background: #34302b; border-color: var(--olive); }
+.shell[data-theme='michael'] .starter-prompts .icon { color: var(--olive); }
+.shell[data-theme='michael'] .sidebar-footer,
+.shell[data-theme='michael'] .welcome-note,
+.shell[data-theme='michael'] .conversation-start,
+.shell[data-theme='michael'] .page-footer,
+.shell[data-theme='michael'] .composer-footer { color: var(--ink-soft); }
+.shell[data-theme='michael'] .bubble-user .bubble-body { background: #36302a; color: var(--ink); border: 1px solid #594737; }
+.shell[data-theme='michael'] .composer { background: var(--panel); }
+.shell[data-theme='michael'] .composer-field,
+.shell[data-theme='michael'] .photo-preview { background: #242528; border-color: #454548; }
+.shell[data-theme='michael'] .composer-field:focus-within { border-color: var(--olive); box-shadow: 0 0 0 3px #d5b08020; }
+.shell[data-theme='michael'] .composer textarea::placeholder { color: #aaa69e; }
+.shell[data-theme='michael'] .composer button { background: var(--olive); color: #191613; }
+.shell[data-theme='michael'] .composer button:hover:not(:disabled) { background: #e4c399; }
+.shell[data-theme='michael'] .composer button:disabled { background: #373739; color: #99948c; }
+.shell[data-theme='michael'] .composer .attach-photo,
+.shell[data-theme='michael'] .composer .remove-photo { background: #36312b; color: #e0bb8b; }
+.shell[data-theme='michael'] .composer .attach-photo:hover:not(:disabled),
+.shell[data-theme='michael'] .composer .remove-photo:hover:not(:disabled) { background: #4b3e2e; color: #f0d2ac; }
+.shell[data-theme='michael'] .keyboard-hint > span { color: #aba396; }
+.shell[data-theme='michael'] .photo-error { color: #ffb6a5; }
+.shell[data-theme='michael'] .error { color: #ffb6a5; background: #372422; border-color: #66433b; }
+.shell[data-theme='michael'] .recipe-content .recipe-card { background: #202124; }
+.shell[data-theme='michael'] .recipe-content pre,
+.shell[data-theme='michael'] .recipe-content .recipe-ingredients,
+.shell[data-theme='michael'] .recipe-content .recipe-card-photos { background: #2a2b2e; }
+.shell[data-theme='michael'] .recipe-content .recipe-section-heading::before { background: var(--olive); }
+.shell[data-theme='michael'] .recipe-content li::marker { color: var(--olive); }
+.shell[data-theme='michael'] .recipe-content a.recipe-source-link { background: #302a23; border-color: #66513a; }
+.shell[data-theme='michael'] .recipe-content a.recipe-source-link:hover { background: #42372a; border-color: var(--olive); }
+@media (max-width: 540px) {
+  .shell[data-theme='michael'] .brand-name { font-size: 22px; }
+  .shell[data-theme='michael'] .topbar-note { max-width: 12ch; }
+}

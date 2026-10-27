@@ -7,6 +7,7 @@ from backend.factories.model_builders import (
 from langchain_core.language_models.chat_models import BaseChatModel
 from backend.graphs.base_chat_graph import BaseChatGraph
 from backend.graphs.recipe_chat_graph import RecipeChatGraph
+from backend.graphs.compiled_recipe_chat_graph import CompiledRecipeChatGraph
 from backend.config.services import ServiceConfig
 from backend.services.contracts import (
     BaseDietitianService,
@@ -26,17 +27,26 @@ from backend.services.ingestion.recipe_ingestion_service import RecipeIngestionS
 from backend.services.chat.recipe_presentation_service import RecipePresentationService
 from backend.services.chat.recipe_search_service import RecipeSearchService
 from backend.services.chat.request_validator import RequestValidator
+from backend.guards.contracts import GuardEvaluator
+from backend.guards.decisions import build_decisions_evaluator
+from backend.services.chat.image_recognizer import BaseImageRecognizer, LLMImageRecognizer
 
 
 class ServiceFactories:
     def __init__(self):
+        self.image_recognizer = ServiceFactory("image_recognizer", BaseImageRecognizer)
+        self.image_recognizer.register("llm", LLMImageRecognizer)
+        self.guard_evaluator = ServiceFactory("guard_evaluator", GuardEvaluator)
+        self.guard_evaluator.register("decisions", build_decisions_evaluator, uses_resources=True)
+
         self.chat_graph = ServiceFactory("chat_graph", BaseChatGraph)
         self.chat_graph.register("recipe", RecipeChatGraph)
+        self.chat_graph.register("json_recipe", CompiledRecipeChatGraph)
 
         self.chat_model = ServiceFactory("chat_model", BaseChatModel)
-        self.chat_model.register("openai", openai_chat)
-        self.chat_model.register("anthropic", anthropic_chat)
-        self.chat_model.register("google_genai", google_chat)
+        self.chat_model.register("openai", openai_chat, uses_resources=True)
+        self.chat_model.register("anthropic", anthropic_chat, uses_resources=True)
+        self.chat_model.register("google_genai", google_chat, uses_resources=True)
 
         self.message_analyzer = ServiceFactory("message_analyzer", BaseMessageAnalyzer)
         self.message_analyzer.register("llm", MessageAnalyzer)

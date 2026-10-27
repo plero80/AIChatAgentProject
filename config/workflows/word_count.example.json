@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "word_count_example",
+  "nodes": [
+    {"id": "analyze", "kind": "word_analysis", "needs": ["message"]},
+    {"id": "respond", "kind": "word_reply", "needs": ["analysis"]}
+  ],
+  "edges": [
+    {"from": "START", "to": "analyze"},
+    {"from": "analyze", "to": "respond"},
+    {"from": "respond", "to": "END"}
+  ]
+}

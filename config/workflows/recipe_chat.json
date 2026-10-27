@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "recipe_chat",
+  "nodes": [
+    {
+      "id": "analyze",
+      "kind": "recipe_analysis",
+      "needs": ["message", "messages"]
+    },
+    {
+      "id": "chat",
+      "kind": "recipe_chat",
+      "needs": ["message", "messages"]
+    },
+    {
+      "id": "recipe",
+      "kind": "recipe_execute",
+      "needs": ["message", "analysis"]
+    },
+    {
+      "id": "dietitian",
+      "kind": "recipe_contact",
+      "needs": []
+    },
+    {
+      "id": "respond",
+      "kind": "recipe_response",
+      "needs": ["message", "messages", "result"]
+    }
+  ],
+  "edges": [
+    {"from": "START", "to": "analyze"},
+    {"from": "chat", "to": "respond"},
+    {"from": "recipe", "to": "respond"},
+    {"from": "dietitian", "to": "respond"},
+    {"from": "respond", "to": "END"}
+  ],
+  "routes": [
+    {
+      "from": "analyze",
+      "router": "recipe_intent",
+      "paths": {"chat": "chat", "recipe": "recipe", "dietitian": "dietitian"}
+    }
+  ]
+}

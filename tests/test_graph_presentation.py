@@ -6,11 +6,9 @@ from backend.graphs.recipe_chat_graph import RecipeChatGraph
 from backend.graphs.graph_requests import ChatGraphRequest
 from backend.graphs.recipe_chat_nodes import RecipeChatNodes
 from backend.models.message_analysis import MessageAnalysis
-from backend.models.request_validation import RequestValidation
-from backend.nodes.chat.guard_node import GuardNode
 
 
-def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
+def test_persisted_recipe_blocks_do_not_leak_into_later_admitted_turns():
     class Analyze:
         async def __call__(self, state):
             # Every turn must begin with presentation/routing state cleared.
@@ -19,14 +17,6 @@ def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
             return {"analysis": MessageAnalysis(
                 intent="chat", recipe_mode="none", ingredients=[], preferences=[], confidence=1
             )}
-
-    class Validator:
-        async def validate(self, message, history=""):
-            if message == "reject":
-                return RequestValidation(legitimate=False, reason="לא קשור למטבח")
-            if message == "follow-up":
-                raise RuntimeError("validation temporarily unavailable")
-            return RequestValidation(legitimate=True)
 
     class Branch:
         async def __call__(self, state):
@@ -44,7 +34,6 @@ def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
     branch = Branch()
     nodes = RecipeChatNodes(
         analysis=Analyze(),
-        guard=GuardNode(Validator(), branch, branch, branch),
         response=Response(),
         chat=branch,
         recipe=branch,
@@ -55,10 +44,6 @@ def test_persisted_recipe_blocks_and_rejection_do_not_leak_into_later_turns():
     async def conversation():
         first = await graph.arun(ChatGraphRequest("recipe", "one-session", dietitian_id="clinic_001"))
         assert first["response_blocks"][0]["type"] == "recipe"
-
-        rejected = await graph.arun(ChatGraphRequest("reject", "one-session", dietitian_id="clinic_001"))
-        assert rejected["response_blocks"] == [{"type": "text", "text": "לא קשור למטבח"}]
-        assert "tofu.jpg" not in str(rejected["response_blocks"])
 
         final = await graph.arun(ChatGraphRequest("follow-up", "one-session", dietitian_id="clinic_001"))
         assert final["final_response"] == "follow-up"

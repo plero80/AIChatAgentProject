@@ -111,7 +111,7 @@ function instagramCode(url) {
 function imageCode(url) {
   try {
     const path = new URL(url, 'https://recipe.local').pathname
-    return path.match(/^\/recipe-images\/([A-Za-z0-9_-]+)\.(?:jpe?g|png|webp|avif)$/i)?.[1] ?? null
+    return path.match(/^(?:\/api\/clients\/[a-z][a-z0-9-]{0,63})?\/recipe-images\/([A-Za-z0-9_-]+)\.(?:jpe?g|png|webp|avif)$/i)?.[1] ?? null
   } catch {
     return null
   }

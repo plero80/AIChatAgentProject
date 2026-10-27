@@ -1,33 +1,67 @@
 # Dietitian chat — exact runtime flow
 
-The dietitian is selected once per deployment. See [deployment configuration](DIETITIAN_DEPLOYMENTS.md).
+Messages can include up to ten photos before the business graph: validate/normalize
+all photos, guard them together with the text, recognize ingredients, then pass
+text plus observations into the flow below. See
+[iteration 11](iterations/11_MULTIPLE_PHOTOS.md) for the request format and limits,
+and [iteration 10](iterations/10_PHOTO_CHAT.md) for configuration and release setup.
+
+## Database client routing
+
+`CLIENT_CONFIG_SOURCE=database` serves `/c/{slug}` and
+`/api/clients/{slug}/chat`. PostgreSQL resolves the URL, pins each browser conversation
+to a release, and serializes turns across workers. The facade loads the pinned
+release's bindings, then applies the same admission-before-execution flow described
+below. See [iteration 9](iterations/09_CLIENT_RELEASES_AND_BINDINGS.md) for the full
+request diagram and migration procedure. File mode retains the original routes.
+
+## Legacy file-mode request
+
+In legacy file mode, the dietitian is selected once per deployment. See [deployment configuration](DIETITIAN_DEPLOYMENTS.md).
 
 This is the path of one `POST /chat` request. Node names are LangGraph keys. Methods are the real callables.
 
+The API calls `ChatWorkflow.respond(ConversationRequest)` through a facade-bound
+proxy in `app.state.workflow`. The facade acquires a cached runtime and the local
+conversation lock. `GuardedWorkflow` checks admission; on approval its
+`RecipeWorkflowAdapter` translates the request to
+`ChatGraphRequest`, runs the graph below, and returns `ChatResponse(reply, blocks)`.
+The API keeps `app.state.workflow_facade` for diagnostics and warms the selected
+workflow at startup. On shutdown the facade drains turns and closes runtime-owned
+resources before the checkpoint pool closes. The deployment still selects one
+dietitian at startup. See [iteration 7](iterations/07_FACADE_STARTUP.md).
+
+Selecting `chat_graph=json_recipe` builds the same behavior from
+`config/workflows/recipe_chat.json` through the new compiler. Its response step is
+named `respond`. The compiler derives state fields from node contracts and checks
+state access and updates; see [iteration 3](iterations/03_JSON_WORKFLOW_COMPILER.md).
+
 ---
 
-## GraphState fields (shared memory)
+## GraphState fields (per-conversation state)
 
-Written incrementally. `messages` uses `add_messages` so it **appends**, it does not replace.
+Written incrementally and isolated by checkpoint thread. Users share the compiled
+graph, not a mutable state object. `messages` uses `add_messages` to merge message
+updates; new message IDs append, while an existing ID updates that message.
 
 | Field | Type | Who writes it | Purpose |
 |---|---|---|---|
-| `user_id` | `str` | `RecipeChatGraph.arun` | Session id = LangGraph `thread_id` (from cookie `alona_session`) |
+| `user_id` | `str` | `RecipeChatGraph.arun` | Session from cookie `alona_session`; thread ID is `dietitian_id:user_id` |
 | `message` | `str` | `arun` | Latest user text only |
 | `analysis` | `MessageAnalysis \| None` | `AnalyzeNode` | Intent + recipe mode + ingredients |
-| `validation` | `RequestValidation \| None` | `GuardNode` | `legitimate` plus a user-facing `reason` when the request is rejected. `None` if the checker failed and the flow continued |
-| `result` | `dict \| None` | Chat / Recipe / Dietitian, via `GuardNode` | Structured work product for `ResponseNode`. Cleared when the request is rejected |
+| `validation` | `RequestValidation \| None` | Reset by Python `arun` | Legacy checkpoint channel, now always cleared; admission lives outside graph state |
+| `result` | `dict \| None` | Chat / Recipe / Dietitian nodes | Structured work product for `ResponseNode` on an admitted turn |
 | `dietitian_id` | `str` | Startup context / `arun` | Ownership and history namespace |
-| `messages` | `list[BaseMessage]` | `arun` + Guard/Response | Rolling conversation (checkpointer persists it) |
-| `final_response` | `str \| None` | `GuardNode` on reject, else `ResponseNode` | Complete Markdown for conversation history and older clients |
-| `response_blocks` | `list[dict] \| None` | `GuardNode` on reject, else `ResponseNode` | Ordered text and recipe cards; each recipe includes its own saved image |
+| `messages` | `list[BaseMessage]` | `arun` + Chat/Response | Rolling conversation (checkpointer persists it) |
+| `final_response` | `str \| None` | `ResponseNode` | Complete Markdown for conversation history and older clients |
+| `response_blocks` | `list[dict] \| None` | `ResponseNode` | Ordered text and recipe cards; each recipe includes its own saved image |
 | `context` | `dict` | unused today | Reserved |
 
 ### MessageAnalysis fields
 
 | Field | Values | Why it exists |
 |---|---|---|
-| `intent` | `chat` / `food` / `dietitian_escort` | **Only** this chooses the branch inside `GuardNode` |
+| `intent` | `chat` / `food` / `dietitian_escort` | Selects the business branch through `route_after_analysis` |
 | `recipe_mode` | `existing` / `inspired` / `original` / `none` | Used **inside** `RecipeNode`, not for routing |
 | `ingredients` | `list[str]` | Keywords for SQL substring match |
 | `preferences` | `list[str]` | Passed into generation prompts |
@@ -38,97 +72,33 @@ Written incrementally. `messages` uses `add_messages` so it **appends**, it does
 ## Chat graph (runtime)
 
 ```mermaid
-flowchart TB
-  subgraph ENTRY["1. HTTP — api.chat()"]
-    UI["Frontend sendChatMessage(message)<br/>credentials: include"]
-    COOKIE["resolve_session_id(cookie alona_session)<br/>reject non-UUID → new uuid4"]
-    RL["enforce_rate_limits(user_id, client_ip)<br/>15/min user · 40/min IP"]
-    ARUN["RecipeChatGraph.arun(ChatGraphRequest(message, user_id, dietitian_id))<br/>initial_state: user_id, message,<br/>messages=[HumanMessage]<br/>config.thread_id = dietitian_id:user_id"]
-    UI --> COOKIE --> RL --> ARUN
-  end
-
-  subgraph ANALYZE["2. AnalyzeNode.__call__"]
-    H["Read messages[-6:] + current message<br/>Why: pronouns like 'עוד רעיון' need history"]
-    LLM["MessageAnalyzer.analyze()<br/>llm.with_structured_output(MessageAnalysis).ainvoke"]
-    OV["_apply_mode_overrides(current_user_message only)<br/>Why: history often mentions 'אלונה' and would<br/>force existing even when user said NOT Alona"]
-    WRITE["Writes state.analysis"]
-    H --> LLM --> OV --> WRITE
-  end
-
-  ARUN --> ANALYZE
-
-  subgraph GUARD["3. GuardNode.__call__ — parent"]
-    FORK["Starts two tasks at once:<br/>RequestValidator.validate(message, history)<br/>and the branch chosen from analysis.intent"]
-    VERDICT{"validation.legitimate?"}
-    FORK --> VERDICT
-    VERDICT -->|false| STOP["cancel the branch<br/>final_response = validation.reason<br/>route_after_guard → END<br/>Why: the branch must not write to the user"]
-    VERDICT -->|true or checker error| KEEP["await the branch<br/>write result + validation<br/>route_after_guard → response"]
-    I1{"analysis.intent"}
-    KEEP --> I1
-    I1 -->|chat or None| CHAT
-    I1 -->|food| RECIPE
-    I1 -->|dietitian_escort| DIET
-  end
-
-  ANALYZE --> GUARD
-
-  subgraph CHAT["ChatNode.__call__"]
-    C1["llm.ainvoke(system + messages[-10:])<br/>Why: greetings / small talk, NO DB"]
-    C2["Writes result = {mode: chat, text}<br/>and appends AIMessage"]
-    C1 --> C2
-  end
-
-  subgraph RECIPE["RecipeNode.__call__"]
-    R0["Guard: analysis is None or intent != food → result None"]
-    R1["mode = recipe_mode, but none → existing<br/>Why: a food ask without a mode still means lookup"]
-    R2["RecipePlan(ingredients, preferences, mode)"]
-    R3{"mode"}
-    R0 --> R1 --> R2 --> R3
-
-    R3 -->|existing| EX["find_best_recipes(user_text, plan)"]
-    EX -->|hits| EX2["result = {mode: existing, recipes: model_dump}"]
-    EX -->|empty| NF["result = {mode: not_found}<br/>Why: do NOT invent an Alona recipe"]
-
-    R3 -->|inspired| IN["find_best_recipes then<br/>generate_inspired_recipe(plan, similar)<br/>Why: new dish, style of Alona, not the stored one"]
-    IN --> IN2["result = {mode: inspired, text}"]
-
-    R3 -->|original| OR["generate_original_recipe(plan)<br/>Why: user asked for YOUR idea / not Alona's DB"]
-    OR --> OR2["result = {mode: original, text}"]
-  end
-
-  subgraph SEARCH["find_best_recipes — why two stages"]
-    S1["find_recipe_with_ingredients()<br/>LOWER(name) LIKE %term%<br/>Why: 'אורז' must match 'אורז בסמטי / יסמין'<br/>exact equality used to miss"]
-    S2["aembed_query(user_text)  // parallel with S1"]
-    S3["find_most_similar_recipes(embedding, candidate_ids or None)<br/>Why: if no ingredient hit, rank ALL recipes"]
-    S4["get_many(ids) + get_ingredients(id)<br/>Why: ingredients live in another table"]
-    S1 --> S3
-    S2 --> S3 --> S4
-  end
-
-  EX -.-> SEARCH
-
-  subgraph DIET["DietitianNode.__call__"]
-    D1["DietitianService.get_dietitian_url()<br/>uses startup profile.contact_url"]
-    D2["result = {mode: dietitian_escort, text}"]
-    D1 --> D2
-  end
-
-  subgraph RESP["ResponseNode.__call__"]
-    P["Saved recipes: structured recipe ID selection<br/>then canonical cards from database fields.<br/>Other modes: llm.ainvoke for final text"]
-    F["Writes final_response + response_blocks<br/>and appends the displayed answer as AIMessage"]
-    P --> F
-  end
-
-  CHAT --> RESP
-  EX2 --> RESP
-  NF --> RESP
-  IN2 --> RESP
-  OR2 --> RESP
-  DIET --> RESP
-
-  STOP --> OUT["HTTP { reply: final_response, blocks: response_blocks }"]
-  RESP --> OUT
+flowchart TD
+  UI["POST /chat: message + session cookie"] --> SESSION["Resolve session and enforce client-scoped rate limits"]
+  SESSION --> FACADE["WorkflowFacade: lease runtime and lock conversation"]
+  FACADE --> HISTORY["GuardedWorkflow: read bounded checkpoint history"]
+  HISTORY --> CHECK["RequestGuard: safety + relevance in one Decisions call"]
+  HISTORY -->|failure| UNAVAILABLE["Unavailable text response; no graph execution"]
+  CHECK -->|failure| UNAVAILABLE
+  CHECK -->|unsafe or irrelevant| REFUSAL["Configured refusal; no checkpoint update"]
+  CHECK -->|allow| ADAPTER["RecipeWorkflowAdapter -> RecipeChatGraph.arun"]
+  ADAPTER --> ANALYZE["AnalyzeNode: recent messages + current turn"]
+  ANALYZE --> INTENT{"analysis.intent"}
+  INTENT -->|chat| CHAT["ChatNode: create conversational draft"]
+  INTENT -->|food| RECIPE["RecipeNode: search or generate according to recipe_mode"]
+  INTENT -->|dietitian_escort| CONTACT["DietitianNode: configured contact details"]
+  CHAT --> RESPONSE["ResponseNode: compose text or select canonical recipe cards"]
+  RECIPE --> RESPONSE
+  CONTACT --> RESPONSE
+  RESPONSE --> OUTPUT["ChatResponse: reply + blocks"]
+  RESPONSE <--> CHECKPOINT["Approved conversation state: client_id:conversation_id"]
 ```
+
+The graph starts only after admission. There is no speculative branch or internal
+validator. Guard failure is fail-closed; the API does not replay an entire turn
+after a database error. Default settings are in `config/guard.json`; client files
+and `GUARD_CONFIG` can select a different trusted policy. History reads and
+evaluation each have a timeout. Admission results are logged without message text.
+See [iteration 8](iterations/08_GUARD_STARTUP.md) for configuration and migration.
 
 ---
 
@@ -152,7 +122,9 @@ recipe cards and rejection state cannot carry into the next response.
 
 ## Why routing is intent-only
 
-`recipe_mode` is **not** a graph edge. `GuardNode` picks chat, recipe, or dietitian from `analysis.intent` only, and runs that branch beside the legitimacy check. One `recipe` node reads `analysis.recipe_mode` and picks a method:
+`route_after_analysis` picks chat, recipe, or dietitian from `analysis.intent`.
+The JSON equivalent selects the `recipe_intent` router. Admission has already
+completed before analysis. Inside the recipe branch, `analysis.recipe_mode` selects a method:
 
 - **existing** — user wants a saved Alona recipe (`מתכון של אלונה`, `שמור אצלך`)
 - **inspired** — new recipe in her style
@@ -181,5 +153,5 @@ flowchart LR
 ## Persistence
 
 - **Recipes:** `recipes` / `recipe_ingredients` / `recipe_embeddings` (vector 1536)
-- **Chat memory:** LangGraph `AsyncPostgresSaver`, `thread_id = user_id`
+- **Chat memory:** LangGraph `AsyncPostgresSaver`, `thread_id = client_id:conversation_id`
 - **Why cookie not body `user_id`:** client-supplied ids let anyone join another thread

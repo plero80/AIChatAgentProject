@@ -14,7 +14,6 @@
   },
   "assignments": {
     "message_analyzer": "classifier",
-    "request_validator": "classifier",
     "recipe_generation": "writer",
     "recipe_extractor": "classifier",
     "chat": "writer",

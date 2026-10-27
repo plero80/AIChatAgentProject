@@ -79,7 +79,7 @@ def test_default_factories_build_chat_and_ingestion_without_network(monkeypatch)
     chat = main.create_app(service_config=config)
     ingestion = main.create_ingest_recipe(service_config=config)
     assert isinstance(chat.nodes.analysis.analyzer, BaseMessageAnalyzer)
-    assert isinstance(chat.nodes.guard.validator, BaseRequestValidator)
+    assert not hasattr(chat.nodes, "guard")
     assert isinstance(ingestion.extract_node.extractor, BaseRecipeExtractorService)
     assert isinstance(ingestion.persist_node.ingestion_service, BaseRecipeIngestionService)
 
@@ -148,7 +148,8 @@ def test_alternative_services_run_through_the_existing_chat_graph(monkeypatch, t
         assert "Experimental recipe" in str((await graph.arun(ChatGraphRequest("invent", "another-user", dietitian_id="clinic_001")))["result"])
 
     asyncio.run(conversation())
-    assert {"validate", "search", "generate", "dietitian", "present"} <= set(calls)
+    assert {"search", "generate", "dietitian", "present"} <= set(calls)
+    assert "validate" not in calls  # The legacy service is no longer constructed/invoked.
     assert analyzer.calls[0][1] == "invent"
     assert "Recent conversation:" in analyzer.calls[1][0]
 

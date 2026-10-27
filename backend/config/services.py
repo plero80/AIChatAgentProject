@@ -28,6 +28,7 @@ class ServiceConfig(BaseModel):
     # Provider for the implicit default model profile; explicit profiles use models.json.
     chat_model: ImplementationName = "openai"
     message_analyzer: ImplementationName = "llm"
+    # Legacy selection retained for parsing older configs; chat admission uses guard.json.
     request_validator: ImplementationName = "llm"
     recipe_search: ImplementationName = "postgres"
     recipe_generation: ImplementationName = "llm"

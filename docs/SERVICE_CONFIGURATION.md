@@ -1,10 +1,46 @@
 # Project organization and configuration
 
+## Published client configuration
+
+Photo messages use an optional `image_recognition` release configuration containing
+the vision service, model profile, extraction prompt and timeout. File mode loads
+`config/image_recognition.json`. The service runs after admission and before the
+business graph; see [iteration 10](iterations/10_PHOTO_CHAT.md).
+
+With `CLIENT_CONFIG_SOURCE=database`, HTTP requests resolve their client from
+`/api/clients/{slug}` and use the conversation's immutable release. Node bindings
+select services, prompts and model profiles from that release. The environment/file
+precedence described below applies to legacy file mode, ingestion and release export.
+See [iteration 9](iterations/09_CLIENT_RELEASES_AND_BINDINGS.md) for JSON examples,
+publication, rollback and migration commands.
+
 For deployment identity, prompt files, database migration, and separate clinic
 frontends, see [Dietitian deployments](DIETITIAN_DEPLOYMENTS.md).
 
 Application code lives in the `backend` package. Python modules use lowercase
 snake_case filenames; class names such as `RecipeChatGraph` remain the same.
+
+Graph construction appends structured events to `output/graph_build.jsonl`.
+Set `GRAPH_BUILD_LOG` to choose another destination; relative paths resolve from
+the project root. This covers both recipe graph implementations and ingestion.
+See [iteration 5](iterations/05_GRAPH_BUILD_TRACE.md) for reading the trace and
+the next assembly change. The file contains construction metadata, without
+request contents or runtime state values.
+
+Default API/CLI chat startup now uses `backend/workflows/facade.py` and its bounded
+per-worker cache. It warms the selected workflow once and closes owned resources
+on shutdown. The API checkpoint pool outlives cached runtimes. Run
+`python -m backend.workflows.facade_example` for an offline demonstration. See
+[iteration 6](iterations/06_WORKFLOW_FACADE_CACHE.md) for cache mechanics and
+[iteration 7](iterations/07_FACADE_STARTUP.md) for startup and resource ownership.
+
+Managed chat startup always wraps its selected workflow with `GuardedWorkflow`.
+It checks safety and scope before graph execution using the Decisions evaluator.
+Guard settings load from `GUARD_CONFIG`, otherwise a client-specific `guard.json`,
+otherwise `config/guard.json`. See [iteration 8](iterations/08_GUARD_STARTUP.md)
+for policy fields, starting thresholds, history limits, and refusal behavior.
+The old `request_validator` service/model selections remain parseable but are
+unused by public chat; admission is configured separately.
 
 ```text
 main.py                       CLI launcher
@@ -40,7 +76,7 @@ tests/                        Automated Python tests
 docs/
   notes/                      Existing design notes, preserved as written
   legacy/                     Unused early graph-state draft, kept for reference
-output/                       Generated deliverables, including the async trace PDF
+output/                       Generated deliverables and graph_build.jsonl construction log
 ```
 
 Run commands from the project root using your Python environment:
@@ -124,12 +160,19 @@ its existing service/model flags.
 
 ### Graph execution contract
 
-Both graphs implement `BaseGraph[RequestT, ResultT]` in `backend/graphs/base_graph.py`.
-Chat workflows specialize this as `BaseChatGraph`, the contract consumed by
-FastAPI and `ChatCommand`. Recipe ingestion retains its separate request type.
-Each subclass implements `async arun(request)`. The base class supplies
-`run(request)` for synchronous callers outside an event loop. Task inputs are
-frozen dataclasses in `backend/graphs/graph_requests.py`:
+FastAPI and `ChatCommand` consume `ChatWorkflow.respond(ConversationRequest)` and
+receive a public `ChatResponse`. Default startup returns a facade-bound proxy;
+the facade leases the guarded recipe workflow for each turn. Its managed factory
+calls `create_chat_workflow()` to construct the selected graph and wrap it in
+`RecipeWorkflowAdapter`. The adapter translates
+conversation input and extracts presentation output; internal recipe state stays
+inside the graph.
+
+The underlying graphs still implement `BaseGraph[RequestT, ResultT]` in
+`backend/graphs/base_graph.py`. `BaseChatGraph` retains the recipe-style internal
+contract, and ingestion retains its separate request type. These graph classes
+implement `async arun(request)` and inherit `run(request)` for synchronous callers.
+For direct access to those internal graphs, the existing API remains:
 
 ```python
 from backend.graphs.graph_requests import ChatGraphRequest, RecipeIngestionRequest
@@ -149,7 +192,10 @@ In synchronous code, use `chat.run(ChatGraphRequest(...))` or
 `ingestion.run(RecipeIngestionRequest(...))` instead. The former positional
 `arun(message, user_id)` and `run(raw_recipe)` signatures have been replaced by
 request objects. The HTTP `/chat` request and response formats are unchanged;
-the endpoint creates a `ChatGraphRequest` internally. Ingestion uses LangGraph's
+the endpoint now creates a `ConversationRequest`, and the recipe adapter translates
+it to `ChatGraphRequest`. The session ID is the conversation ID, and the checkpoint
+key remains `client_id:conversation_id`. The default release marker is `legacy`;
+release publication and selection are not implemented yet. Ingestion uses LangGraph's
 async invocation, which runs the existing synchronous ingestion nodes in worker
 threads. Embeddings remain the original OpenAI implementation.
 
@@ -159,14 +205,22 @@ threads. Embeddings remain the original OpenAI implementation.
 
 ```python
 return {
-    "chat": ChatCommand(create_app),
+    "chat": ChatCommand(open_chat_workflow),
     "ingest": IngestCommand(create_ingest_recipe),
 }
 ```
 
 `backend/cli/commands/base_command.py` defines `add_arguments(parser)` and `async run(args)`.
-The concrete handlers collect task-specific input, call their graph through
-`arun(request)`, and display the result. The chat loop and recipe file handling
+`open_chat_workflow()` is an async context manager; `ChatCommand` enters it once
+and exits it on every termination path. Its in-memory checkpointer lives outside
+the runtime cache, while the API supplies its shared PostgreSQL saver. Custom
+registered builders that own connections should use `uses_resources=True` and
+register cleanup with the supplied `resources` stack. Stateless constructors
+keep their existing signatures.
+
+The concrete handlers collect task-specific input and display the result. Chat
+calls `workflow.respond(request)` and prints `response.reply`; ingestion calls
+`graph.arun(request)`. The chat loop and recipe file handling
 live in those handlers. `backend.cli.runner.run_cli()` validates shared configuration and
 dispatches the selected command; only that command constructs a graph.
 
@@ -199,7 +253,7 @@ are errors. Keep credentials in environment variables, not in this JSON file.
 | `chat_graph` | `CHAT_GRAPH_TYPE` | `recipe` | `nodes` (`RecipeChatNodes`), `checkpointer`, `model_registry`, `tenant` |
 | `chat_model` (implicit default profile provider) | `CHAT_MODEL_TYPE` | `openai` | `profile` (`ModelProfile`) |
 | `message_analyzer` | `MESSAGE_ANALYZER_TYPE` | `llm` | `llm`, `tenant` |
-| `request_validator` | `REQUEST_VALIDATOR_TYPE` | `llm` | `llm`, `tenant` |
+| `request_validator` (legacy, unused by chat) | `REQUEST_VALIDATOR_TYPE` | `llm` | Replaced by guard configuration |
 | `recipe_search` | `RECIPE_SEARCH_TYPE` | `postgres` | `recipe_repository`, `ingredient_repository`, `embedding_repository`, `embedding_model` |
 | `recipe_generation` | `RECIPE_GENERATION_TYPE` | `llm` | `llm`, `tenant` |
 | `recipe_extractor` | `RECIPE_EXTRACTOR_TYPE` | `llm` | `llm`, `tenant` |
@@ -223,8 +277,9 @@ startup reads the same JSON and environment settings.
 
 ## Switching the chat graph used by FastAPI
 
-FastAPI holds a `BaseChatGraph`, not a concrete `RecipeChatGraph`. At startup,
-`backend.bootstrap.create_app()` builds the configured services and node container, then calls:
+FastAPI holds a `ChatWorkflow` in `app.state.workflow`. The default
+`RecipeWorkflowAdapter` wraps a selected `BaseChatGraph`. At startup,
+`backend.bootstrap.create_app()` still builds the configured services and node container, then calls:
 
 ```python
 graph = factories.chat_graph.create(
@@ -236,11 +291,27 @@ graph = factories.chat_graph.create(
 )
 ```
 
-The factory requires `BaseChatGraph` and registers `RecipeChatGraph` as `recipe`.
+The factory requires `BaseChatGraph` and registers `RecipeChatGraph` as `recipe`
+and `CompiledRecipeChatGraph` as `json_recipe`.
 The default configuration remains `"chat_graph": "recipe"`. Both the HTTP API
 and CLI chat select this implementation through the same factory. FastAPI builds
-the selected graph once per worker and invokes `arun(ChatGraphRequest(...))` for
-each `/chat` request. The HTTP request/response format remains unchanged.
+the selected graph and its adapter once per worker, then invokes
+`workflow.respond(ConversationRequest(...))` for each `/chat` request. The adapter
+invokes the graph's `arun` method. The HTTP request/response format remains unchanged.
+
+To run the recipe topology from `config/workflows/recipe_chat.json`, select
+`--service chat_graph=json_recipe` in either launcher, or set
+`CHAT_GRAPH_TYPE=json_recipe`. The compiler derives state fields from registered
+node contracts, checks the JSON `needs` lists and paths, and validates runtime
+updates. Services are still assembled by the existing bootstrap. See
+[iteration 3](iterations/03_JSON_WORKFLOW_COMPILER.md) for the runnable offline
+example, supported configuration format, and current limits.
+
+The generic workflow contract and the migration's current limits are documented
+in [iteration 2](iterations/02_WORKFLOW_BOUNDARY.md). A workflow with different
+internal state can implement `ChatWorkflow`; configuring its construction through
+the existing graph registry is a later step. The following registration example
+continues to describe the legacy graph registry.
 
 To add an experiment, implement `BaseChatGraph` in a new graph module. Its
 constructor receives `nodes`, `checkpointer`, `model_registry`, and `tenant`; its async
@@ -259,8 +330,8 @@ from backend.graphs.experimental_chat_graph import ExperimentalChatGraph
 self.chat_graph.register("experimental", ExperimentalChatGraph)
 ```
 
-`ExperimentalChatGraph` is an example name for your implementation; only `recipe`
-is registered by default. Once the experiment is implemented and registered,
+`ExperimentalChatGraph` is an example name for your implementation; `recipe` and
+`json_recipe` are registered by default. Once the experiment is implemented and registered,
 choose it with any of these options:
 
 ```powershell
@@ -387,7 +458,6 @@ to `config/models.json`. For example:
   },
   "assignments": {
     "message_analyzer": "classifier",
-    "request_validator": "classifier",
     "recipe_generation": "writer",
     "recipe_extractor": "classifier",
     "chat": "writer",
@@ -396,7 +466,7 @@ to `config/models.json`. For example:
 }
 ```
 
-Use model IDs available to your accounts. The analyzer, validator, response
+Use model IDs available to your accounts. The analyzer, response
 recipe selector, and extractor require structured output; extraction uses tool
 calling. The example needs `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` to run.
 Inspection commands do not require credentials or make API calls.
@@ -423,7 +493,7 @@ For assignments, precedence is **CLI > environment > JSON > default**:
 | Consumer | Assignment environment variable |
 | --- | --- |
 | `message_analyzer` | `MESSAGE_ANALYZER_MODEL_PROFILE` |
-| `request_validator` | `REQUEST_VALIDATOR_MODEL_PROFILE` |
+| `request_validator` (legacy, unused) | `REQUEST_VALIDATOR_MODEL_PROFILE` |
 | `recipe_generation` | `RECIPE_GENERATION_MODEL_PROFILE` |
 | `recipe_extractor` | `RECIPE_EXTRACTOR_MODEL_PROFILE` |
 | `chat` | `CHAT_MODEL_PROFILE` |
@@ -487,7 +557,6 @@ builder.recipeNode(recipe_generation_service, recipe_search_service)
 builder.chatNode(models.for_role("chat"))
 builder.responseNode(models.for_role("response"), presentation_service)
 builder.dietitianNode(dietitian_service)
-builder.guardNode(request_validator)
 nodes = builder.build()
 
 graph = factories.chat_graph.create(
@@ -509,16 +578,14 @@ nodes = (
     .chatNode(models.for_role("chat"))
     .responseNode(models.for_role("response"), presentation_service)
     .dietitianNode(dietitian_service)
-    .guardNode(request_validator)
     .build()
 )
 ```
 
-`RecipeChatNodes` stores all six nodes as named fields: `analysis`, `recipe`,
-`chat`, `response`, `dietitian`, and `guard`. `build()` checks that every required
-step was configured, and creates the guard using the final chat, recipe, and
-dietitian nodes. Configuration order is flexible, including calling `guardNode()`
-before configuring the branches. Reconfiguring a builder produces a new container
+`RecipeChatNodes` stores five nodes as named fields: `analysis`, `recipe`,
+`chat`, `response`, and `dietitian`. `build()` checks that every required
+step was configured. Admission is assembled around the workflow, independently
+of this container. Reconfiguring a builder produces a new container
 on the next `build()`; it does not replace nodes in an earlier container.
 
 The container's fields are frozen, while the node objects remain usable. Inspect
@@ -528,7 +595,8 @@ nodes through `graph.nodes.analysis`, `graph.nodes.chat`, and the other fields.
 `RecipeChatGraph` accepts the completed container, defines edges and conditional
 routing in `build_graph()`, and compiles with its checkpointer. It retains async
 execution, the synchronous CLI entry point, per-user conversation history, and
-the existing guard behavior. Node construction happens during startup. Changing
+business intent routing. The outer guard now checks requests before graph work,
+and technical guard errors stop the turn. Node construction happens during startup. Changing
 execution order or routing belongs in the graph structure; the builder assembles
 the nodes and their dependencies. Recipe ingestion retains its existing path.
 

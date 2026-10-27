@@ -35,10 +35,8 @@ def dependencies():
 
 
 def configure(builder, deps):
-    # Guard configuration can come before its branch nodes.
     return (
         builder
-        .guardNode(deps.validator)
         .analysisNode(deps.analyzer)
         .recipeNode(deps.generation, deps.search)
         .chatNode(deps.chat_llm)
@@ -60,10 +58,7 @@ def test_fluent_builder_returns_a_node_container_with_shared_branch_nodes(depend
     assert nodes.response.llm is dependencies.response_llm
     assert nodes.response.presentation_service is dependencies.presentation
     assert nodes.dietitian.dietitian_service is dependencies.dietitian
-    assert nodes.guard.validator is dependencies.validator
-    assert nodes.guard.branches == {
-        "chat": nodes.chat, "recipe": nodes.recipe, "dietitian": nodes.dietitian,
-    }
+    assert not hasattr(nodes, "guard")
     dependencies.analyzer.analyze.assert_not_called()
     dependencies.chat_llm.ainvoke.assert_not_called()
     with pytest.raises(FrozenInstanceError):
@@ -71,7 +66,7 @@ def test_fluent_builder_returns_a_node_container_with_shared_branch_nodes(depend
 
 
 @pytest.mark.parametrize("missing", [
-    "analysisNode", "recipeNode", "chatNode", "responseNode", "dietitianNode", "guardNode",
+    "analysisNode", "recipeNode", "chatNode", "responseNode", "dietitianNode",
 ])
 def test_build_reports_unconfigured_nodes(dependencies, missing):
     builder = RecipeChatBuilder()
@@ -81,7 +76,6 @@ def test_build_reports_unconfigured_nodes(dependencies, missing):
         "chatNode": (dependencies.chat_llm,),
         "responseNode": (dependencies.response_llm, dependencies.presentation),
         "dietitianNode": (dependencies.dietitian,),
-        "guardNode": (dependencies.validator,),
     }
     for name, args in steps.items():
         if name != missing:
@@ -98,9 +92,6 @@ def test_reconfiguring_a_builder_does_not_change_an_existing_container(dependenc
 
     assert first.chat.llm is dependencies.chat_llm
     assert second.chat.llm is replacement_llm
-    assert first.guard.branches["chat"] is first.chat
-    assert second.guard.branches["chat"] is second.chat
-    assert first.guard is not second.guard
 
 
 @pytest.mark.parametrize("use_supplied_checkpointer", [False, True])
@@ -128,6 +119,6 @@ def test_graph_runs_built_nodes_and_keeps_user_histories_separate(dependencies, 
     ]
     assert graph.nodes is nodes
     assert dependencies.analyzer.analyze.await_count == 3
-    assert dependencies.validator.validate.await_count == 3
+    dependencies.validator.validate.assert_not_called()
     assert dependencies.chat_llm.ainvoke.await_count == 3
     assert dependencies.response_llm.ainvoke.await_count == 3

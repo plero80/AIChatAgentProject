@@ -14,10 +14,11 @@ from backend.graphs.graph_state import GraphState
 from backend.graphs.base_chat_graph import BaseChatGraph
 from backend.graphs.graph_requests import ChatGraphRequest
 from backend.graphs.recipe_chat_nodes import RecipeChatNodes
+from backend.workflows.build_trace import GraphBuildTrace, qualified_name
 
 
 class RecipeChatGraph(BaseChatGraph):
-    """Connect the supplied nodes and run the recipe chat workflow."""
+    """Business workflow for admitted requests; public startup wraps its adapter."""
 
     def __init__(
         self,
@@ -36,27 +37,51 @@ class RecipeChatGraph(BaseChatGraph):
         self.graph = self.build_graph()
 
     def build_graph(self):
+        with GraphBuildTrace(workflow="recipe_chat", source="python", client_id=self.tenant.dietitian_id) as trace:
+            self.build_trace_path = trace.path
+            return self._build_python_graph(trace)
+
+    def _build_python_graph(self, trace):
+        trace.stage("state_schema")
+        trace.schema(GraphState)
         workflow = StateGraph(GraphState)
-        workflow.add_node("analyze", self.nodes.analysis)
-        workflow.add_node("guard", self.nodes.guard)
-        workflow.add_node("response", self.nodes.response)
-        workflow.add_edge(START, "analyze")
-        # GuardNode runs validation and the selected branch concurrently.
-        workflow.add_edge("analyze", "guard")
+        trace.stage("nodes")
+        for name, node in (
+            ("analyze", self.nodes.analysis), ("chat", self.nodes.chat),
+            ("recipe", self.nodes.recipe), ("dietitian", self.nodes.dietitian),
+            ("response", self.nodes.response),
+        ):
+            workflow.add_node(name, node)
+            trace.record("node_added", node_id=name, implementation=qualified_name(node))
+        trace.stage("connections")
+        for source, target in (
+            (START, "analyze"), ("chat", "response"), ("recipe", "response"),
+            ("dietitian", "response"), ("response", END),
+        ):
+            workflow.add_edge(source, target)
+            trace.record("edge_added", from_node="START" if source == START else source, to_node="END" if target == END else target)
         workflow.add_conditional_edges(
-            "guard",
-            self.route_after_guard,
-            {"response": "response", "end": END},
+            "analyze",
+            self.route_after_analysis,
+            {"chat": "chat", "recipe": "recipe", "dietitian": "dietitian"},
         )
-        workflow.add_edge("response", END)
-        return workflow.compile(checkpointer=self.memory)
+        trace.record(
+            "route_added", from_node="analyze", router=qualified_name(self.route_after_analysis),
+            paths={"chat": "chat", "recipe": "recipe", "dietitian": "dietitian"},
+        )
+        trace.stage("compile", checkpointer=qualified_name(self.memory))
+        graph = workflow.compile(checkpointer=self.memory)
+        trace.record("graph_compiled", state_schema="GraphState")
+        return graph
 
     @staticmethod
-    def route_after_guard(state: GraphState) -> str:
-        validation = state.get("validation")
-        if validation is not None and not validation.legitimate:
-            return "end"
-        return "response"
+    def route_after_analysis(state: GraphState) -> str:
+        analysis = state.get("analysis")
+        if analysis is not None and analysis.intent == "food":
+            return "recipe"
+        if analysis is not None and analysis.intent == "dietitian_escort":
+            return "dietitian"
+        return "chat"
 
     async def arun(self, request: ChatGraphRequest) -> GraphState:
         if request.dietitian_id != self.tenant.dietitian_id:

@@ -1,4 +1,4 @@
-"""Chat workflow contract shared by the HTTP API and interactive CLI."""
+"""Internal graph contract retained behind the public chat workflow adapter."""
 
 from abc import abstractmethod
 

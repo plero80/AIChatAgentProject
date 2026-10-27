@@ -115,7 +115,7 @@ def test_two_graphs_with_one_checkpointer_and_same_user_keep_histories_separate(
     async def respond(state):
         return {"final_response": state["message"], "messages": [AIMessage(content=state["message"])]}
 
-    nodes = RecipeChatNodes(analysis=noop, guard=noop, response=respond, chat=noop, recipe=noop, dietitian=noop)
+    nodes = RecipeChatNodes(analysis=noop, response=respond, chat=noop, recipe=noop, dietitian=noop)
     first = RecipeChatGraph(nodes, checkpointer=memory, tenant=load_tenant("clinic_001"))
     second = RecipeChatGraph(nodes, checkpointer=memory, tenant=load_tenant("clinic_002"))
 
@@ -198,7 +198,7 @@ def test_bootstrap_injects_the_same_snapshot_into_every_prompt_aware_component(m
     monkeypatch.setattr(bootstrap, "get_required_services", lambda *args: (models, object(), object(), object(), object()))
     graph = bootstrap.create_app(tenant=tenant)
     for component in (
-        graph, graph.nodes.analysis.analyzer, graph.nodes.guard, graph.nodes.guard.validator,
+        graph, graph.nodes.analysis.analyzer,
         graph.nodes.chat, graph.nodes.recipe, graph.nodes.recipe.recipe_generation_service,
         graph.nodes.response, graph.nodes.dietitian, graph.nodes.dietitian.dietitian_service,
     ):

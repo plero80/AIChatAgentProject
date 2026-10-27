@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class GuardNode:
-    """Parent step: validate and run the branch together.
+    """Legacy implementation retained for migration tests; not used by startup.
 
     The branch never writes to the user. This node does.
     A rejected request cancels the branch and returns validation.reason.

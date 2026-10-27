@@ -19,7 +19,8 @@ class GraphState(TypedDict):
     # Result of message understanding
     analysis: MessageAnalysis | None
 
-    # Legitimacy check. None when the checker failed open.
+    # Legacy checkpoint channel, cleared on new turns. Admission now happens
+    # outside the business graph and never writes a validation result here.
     validation: RequestValidation | None
 
     # Extra temporary information

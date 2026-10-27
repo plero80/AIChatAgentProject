@@ -36,6 +36,7 @@ class ModelAssignments(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     message_analyzer: ImplementationName = "default"
+    # Compatibility only; the guard evaluator has its own model/client.
     request_validator: ImplementationName = "default"
     recipe_generation: ImplementationName = "default"
     recipe_extractor: ImplementationName = "default"

@@ -108,6 +108,22 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 3px s
 .composer button:disabled { background: #e7ecdf; color: #99a38d; cursor: not-allowed; }
 .composer button .icon { width: 19px; height: 19px; transform: scaleX(-1); }
 .composer-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; margin-top: 9px; padding-inline: 3px; color: #78816f; font-size: 11px; }
+.composer .attach-photo { background: #e7ecdf; color: var(--olive); }
+.composer .attach-photo:hover:not(:disabled) { background: #dce6d2; color: #345238; }
+.composer .attach-photo .icon, .composer .remove-photo .icon { transform: none; }
+.photo-previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; margin-bottom: 10px; }
+.photo-preview { position: relative; min-width: 0; padding: 8px; background: #f9faf5; border-radius: 12px; }
+.photo-preview img { width: 100%; height: 76px; object-fit: cover; border-radius: 8px; }
+.photo-preview > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.composer .remove-photo { position: absolute; top: 4px; inset-inline-end: 4px; width: 28px; height: 28px; background: #fff; color: var(--olive); }
+.composer .remove-photo:hover:not(:disabled) { background: #e7ecdf; }
+.photo-upload-status { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12px; }
+.composer .cancel-photo-read { width: auto; height: auto; padding: 4px 8px; }
+.photo-error { margin: 0 0 8px; color: #9e3434; font-size: 13px; }
+.user-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 480px; margin-bottom: 8px; }
+.user-photos.single-photo { grid-template-columns: minmax(0, 1fr); max-width: 280px; }
+.user-photo { display: block; width: 100%; height: 180px; object-fit: contain; border-radius: 10px; }
+.failed-message { display: block; margin-top: 8px; font-size: 12px; }
 .keyboard-hint > span { padding-inline: 5px; color: #a8b19d; }
 .error { margin: 0; padding: 10px 24px; color: #a04936; background: #fff5ed; font-size: 14px; border-top: 1px solid #efddcf; }
 .page-footer { min-height: 45px; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 11px; color: #79826d; flex-shrink: 0; }

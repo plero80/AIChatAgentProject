@@ -2,7 +2,6 @@
   "chat_graph": "recipe",
   "chat_model": "openai",
   "message_analyzer": "llm",
-  "request_validator": "llm",
   "recipe_search": "postgres",
   "recipe_generation": "llm",
   "recipe_extractor": "llm",

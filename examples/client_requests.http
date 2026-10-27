@@ -1,0 +1,20 @@
+### Use VS Code's REST Client extension, or the PowerShell commands in docs/LOCAL_CLIENTS.md.
+@baseUrl = http://127.0.0.1:8000
+
+### Alona branding and upload limits (no model call)
+GET {{baseUrl}}/api/clients/alona/public-config
+
+### Michael branding and upload limits (no model call)
+GET {{baseUrl}}/api/clients/michael-lipkin/public-config
+
+### Alona chat (requires configured provider credentials)
+POST {{baseUrl}}/api/clients/alona/chat
+Content-Type: application/json
+
+{"message": "Suggest a savory dinner with tomatoes and eggs. Answer in English."}
+
+### Michael chat (requires configured provider credentials)
+POST {{baseUrl}}/api/clients/michael-lipkin/chat
+Content-Type: application/json
+
+{"message": "Suggest a savory dinner with tomatoes and eggs. Answer in English."}

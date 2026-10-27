@@ -6,9 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 import backend.bootstrap as main
+from backend.bootstrap import create_chat_workflow
 from backend.cli.commands.base_command import BaseCommand
 from backend.graphs.base_graph import BaseGraph
-from backend.graphs.graph_requests import ChatGraphRequest, RecipeIngestionRequest
+from backend.graphs.graph_requests import RecipeIngestionRequest
+from backend.clients.context import ClientContext
+from backend.models.chat_response import ChatResponse
+from backend.workflows.contracts import ChatWorkflow, ConversationRequest
 from backend.cli.runner import run_cli
 from backend.config.models import MODEL_ENV_VARS
 from backend.config.services import SERVICE_ENV_VARS
@@ -22,7 +26,7 @@ def no_external_dependencies(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     chat = MagicMock(side_effect=AssertionError("Unexpected chat construction"))
     ingest = MagicMock(side_effect=AssertionError("Unexpected ingestion construction"))
-    monkeypatch.setattr(main, "create_app", chat)
+    monkeypatch.setattr(main, "open_chat_workflow", chat)
     monkeypatch.setattr(main, "create_ingest_recipe", ingest)
     return chat, ingest
 
@@ -39,23 +43,38 @@ class RecordingGraph(BaseGraph):
         return self.result
 
 
-def test_chat_constructs_one_graph_and_keeps_one_session_and_event_loop(monkeypatch, capsys):
-    graph = RecordingGraph({"final_response": "Reply"})
+class RecordingWorkflow(ChatWorkflow):
+    def __init__(self, *, client=None):
+        super().__init__(client or ClientContext(client_id="clinic_001", display_name="Alona"))
+        self.requests = []
+        self.loops = []
+
+    async def _respond(self, request):
+        self.requests.append(request)
+        self.loops.append(asyncio.get_running_loop())
+        return ChatResponse(reply="Reply")
+
+
+def test_chat_constructs_one_workflow_and_keeps_one_session_and_event_loop(monkeypatch, capsys):
+    graph = RecordingWorkflow()
     factory = MagicMock(return_value=graph)
-    monkeypatch.setattr(main, "create_app", factory)
+    monkeypatch.setattr(main, "open_chat_workflow", factory)
     messages = iter(["  Hi!  ", "", "Hello!", "QUIT"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(messages))
 
     assert main.main(["chat", "--user-id", "session-a"]) == 0
     factory.assert_called_once_with()
-    assert graph.requests == [ChatGraphRequest("Hi!", "session-a", dietitian_id="clinic_001"), ChatGraphRequest("Hello!", "session-a", dietitian_id="clinic_001")]
+    assert graph.requests == [
+        ConversationRequest(message=message, conversation_id="session-a", client_id="clinic_001")
+        for message in ("Hi!", "Hello!")
+    ]
     assert graph.loops[0] is graph.loops[1]
     assert capsys.readouterr().out.count("Alona: Reply") == 2
 
 
 def test_chat_generates_a_stable_session_id_and_handles_end_of_input(monkeypatch):
-    graph = RecordingGraph({"final_response": "Reply"})
-    monkeypatch.setattr(main, "create_app", lambda: graph)
+    graph = RecordingWorkflow()
+    monkeypatch.setattr(main, "open_chat_workflow", lambda: graph)
     messages = iter(["Hi", "Again"])
 
     def read(prompt):
@@ -66,12 +85,12 @@ def test_chat_generates_a_stable_session_id_and_handles_end_of_input(monkeypatch
 
     monkeypatch.setattr("builtins.input", read)
     assert main.main(["chat"]) == 0
-    assert graph.requests[0].user_id
-    assert graph.requests[0].user_id == graph.requests[1].user_id
+    assert graph.requests[0].conversation_id
+    assert graph.requests[0].conversation_id == graph.requests[1].conversation_id
 
 
 def test_chat_keyboard_interrupt_returns_130(monkeypatch):
-    monkeypatch.setattr(main, "create_app", lambda: RecordingGraph({}))
+    monkeypatch.setattr(main, "open_chat_workflow", RecordingWorkflow)
     monkeypatch.setattr("builtins.input", MagicMock(side_effect=KeyboardInterrupt))
     assert main.main(["chat"]) == 130
 
@@ -149,7 +168,7 @@ def test_shared_flags_before_and_after_task_are_combined(tmp_path, monkeypatch):
         "first": {"provider": "openai", "model": "first-model"},
         "second": {"provider": "openai", "model": "second-model"},
     }}), encoding="utf-8")
-    graph = RecordingGraph({})
+    graph = RecordingWorkflow()
 
     def create():
         assert os.environ["CHAT_MODEL_PROFILE"] == "second"
@@ -157,7 +176,7 @@ def test_shared_flags_before_and_after_task_are_combined(tmp_path, monkeypatch):
         assert os.environ["MODELS_CONFIG"] == str(path.resolve())
         return graph
 
-    monkeypatch.setattr(main, "create_app", create)
+    monkeypatch.setattr(main, "open_chat_workflow", create)
     monkeypatch.setattr("builtins.input", lambda prompt: "quit")
     assert main.main([
         "--models-config", str(path), "--model", "chat=first",
@@ -196,7 +215,10 @@ def test_another_graph_and_command_can_be_registered_without_changing_dispatch(c
 def test_cli_chat_and_ingestion_use_the_selected_deployment(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("DIETITIAN_ID", "clinic_002")
     chat = RecordingGraph({"final_response": "Reply"})
-    monkeypatch.setattr(main, "create_app", lambda: chat)
+    # Exercise the actual tenant-to-client mapping and recipe adapter for CLI.
+    monkeypatch.setattr(main, "open_chat_workflow", lambda: create_chat_workflow(
+        graph_factory=lambda **dependencies: chat,
+    ))
     messages = iter(["Hi", "quit"])
     monkeypatch.setattr("builtins.input", lambda _: next(messages))
     assert main.main(["chat"]) == 0

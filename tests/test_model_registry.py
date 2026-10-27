@@ -143,9 +143,9 @@ def test_each_role_uses_its_profile_and_requests_reuse_the_clients(monkeypatch):
 
     graph = main.create_app(service_config=ServiceConfig(), service_factories=factories, model_config=config)
     clients = graph.model_registry.models
-    assert len(created) == 6
+    assert len(created) == 5
     assert graph.nodes.analysis.analyzer.llm is clients["message_analyzer"]
-    assert graph.nodes.guard.validator.llm is clients["request_validator"]
+    assert "request_validator" not in clients
     assert graph.nodes.chat.llm is clients["chat"]
     assert graph.nodes.recipe.recipe_generation_service.llm is clients["recipe_generation"]
     assert graph.nodes.response.llm is clients["response"]
@@ -160,9 +160,8 @@ def test_each_role_uses_its_profile_and_requests_reuse_the_clients(monkeypatch):
         assert result["final_response"] == "Reply from response"
 
     asyncio.run(run_requests())
-    assert len(created) == 6  # no construction per request
+    assert len(created) == 5  # no construction per request
     assert clients["message_analyzer"].calls == ["MessageAnalysis"] * 3
-    assert clients["request_validator"].calls == ["RequestValidation"] * 3
     assert clients["chat"].calls == ["text"] * 2
     assert clients["recipe_generation"].calls == ["text"]
     assert clients["response"].calls == ["text"] * 3
